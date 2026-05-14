@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0f1115">
+  <title>Feedback</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="page-title" data-t="page_title">📧 Murojaatlar</div>
+    <div class="page-sub" id="totalCount">—</div>
+  </header>
+
+  <!-- Category tabs -->
+  <nav class="tabs" id="fbTabs">
+    <button class="tab active" data-cat="all">
+      <span data-t="tab_all">Hammasi</span> · <span id="cnt_all">0</span>
+    </button>
+    <button class="tab" data-cat="complaint">
+      <span data-t="tab_complaint">📢 Shikoyatlar</span> · <span id="cnt_complaint">0</span>
+    </button>
+    <button class="tab" data-cat="question">
+      <span data-t="tab_question">❓ Savollar</span> · <span id="cnt_question">0</span>
+    </button>
+    <button class="tab" data-cat="suggestion">
+      <span data-t="tab_suggestion">💡 Takliflar</span> · <span id="cnt_suggestion">0</span>
+    </button>
+  </nav>
+
+  <main class="content">
+    <div id="list">
+      <div class="loading" data-t="loading">Yuklanmoqda…</div>
+    </div>
+  </main>
+
+  <!-- Thread / reply screen -->
+  <section id="threadScreen" class="screen hidden">
+    <header class="screen-header">
+      <button class="back-btn" id="threadBack" type="button" data-t="back">Orqaga</button>
+      <h2 id="threadTitle">—</h2>
+    </header>
+    <div class="content thread-content">
+      <div class="fb-meta" id="threadMeta"></div>
+      <div id="threadMsgs" class="fb-thread">
+        <div class="loading" data-t="loading">Yuklanmoqda…</div>
+      </div>
+      <div id="threadErr" class="err hidden"></div>
+    </div>
+    <div class="reply-bar">
+      <textarea id="replyInput" rows="2" data-t-placeholder="ph_reply" placeholder="Mijozga javob yozing…"></textarea>
+      <button id="replyBtn" class="primary-btn" data-t="reply_btn">📤 Yuborish</button>
+    </div>
+  </section>
+
+  <script>
+    window.STRINGS = {
+      uz: {
+        page_title: "📧 Murojaatlar", loading: "Yuklanmoqda…", back: "Orqaga",
+        tab_all: "Hammasi", tab_complaint: "📢 Shikoyatlar",
+        tab_question: "❓ Savollar", tab_suggestion: "💡 Takliflar",
+        empty: "Bu bo'limda murojaatlar yo'q.",
+        total_short: "{n} ta",
+        cat_complaint: "📢 Shikoyat", cat_question: "❓ Savol", cat_suggestion: "💡 Taklif",
+        status_open: "🟡 Yangi", status_answered: "✅ Javob berilgan",
+        role_user: "👤 Mijoz", role_ai: "🤖 AI", role_admin: "👑 Admin",
+        ph_reply: "Mijozga javob yozing…", reply_btn: "📤 Yuborish", sending: "Yuborilmoqda…",
+        replied: "✅ Javob yuborildi", err_empty: "Matn bo'sh", no_username: "—",
+      },
+      en: {
+        page_title: "📧 Feedback", loading: "Loading…", back: "Back",
+        tab_all: "All", tab_complaint: "📢 Complaints",
+        tab_question: "❓ Questions", tab_suggestion: "💡 Suggestions",
+        empty: "No items in this category.",
+        total_short: "{n}",
+        cat_complaint: "📢 Complaint", cat_question: "❓ Question", cat_suggestion: "💡 Suggestion",
+        status_open: "🟡 New", status_answered: "✅ Answered",
+        role_user: "👤 Customer", role_ai: "🤖 AI", role_admin: "👑 Admin",
+        ph_reply: "Write a reply to the customer…", reply_btn: "📤 Send", sending: "Sending…",
+        replied: "✅ Reply sent", err_empty: "Text empty", no_username: "—",
+      },
+      ru: {
+        page_title: "📧 Обращения", loading: "Загрузка…", back: "Назад",
+        tab_all: "Все", tab_complaint: "📢 Жалобы",
+        tab_question: "❓ Вопросы", tab_suggestion: "💡 Предложения",
+        empty: "В этой категории обращений нет.",
+        total_short: "{n}",
+        cat_complaint: "📢 Жалоба", cat_question: "❓ Вопрос", cat_suggestion: "💡 Предложение",
+        status_open: "🟡 Новое", status_answered: "✅ Отвечено",
+        role_user: "👤 Клиент", role_ai: "🤖 ИИ", role_admin: "👑 Админ",
+        ph_reply: "Напишите ответ клиенту…", reply_btn: "📤 Отправить", sending: "Отправка…",
+        replied: "✅ Ответ отправлен", err_empty: "Текст пустой", no_username: "—",
+      },
+    };
+  </script>
+  <script src="/static/i18n.js"></script>
+  <script src="/static/admin-feedback.js"></script>
+</body>
+</html>

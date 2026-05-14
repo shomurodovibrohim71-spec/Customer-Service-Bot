@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0f1115">
+  <title>Order</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-row">
+      <button id="addrBtn" class="addr-btn" type="button">
+        <span class="pin">📍</span>
+        <span id="addrText" class="addr-text" data-t="no_address">Manzil tanlanmagan</span>
+        <span class="caret">▾</span>
+      </button>
+      <button id="historyBtn" class="icon-btn" type="button" data-t-title="history_title" title="Buyurtmalar tarixi">📜</button>
+    </div>
+  </header>
+
+  <nav id="tabs" class="tabs" aria-label="Categories"></nav>
+
+  <main id="content" class="content">
+    <div class="loading" data-t="loading">Yuklanmoqda…</div>
+  </main>
+
+  <div id="cartBar" class="cart-bar hidden">
+    <span id="cartCount" class="cart-count">0</span>
+    <span class="cart-label" data-t="cart_label">Savatcha</span>
+    <strong id="cartTotal" class="cart-total">0</strong>
+  </div>
+
+  <section id="cartScreen" class="screen hidden">
+    <header class="screen-header">
+      <button class="back-btn" id="cartBack" type="button" data-t="back">Orqaga</button>
+      <h2 data-t="cart_title">🛒 Savatcha</h2>
+    </header>
+    <div id="cartItems" class="cart-items"></div>
+    <div class="cart-summary">
+      <div class="row"><span data-t="lbl_total">Jami:</span><strong id="cartSumTotal">0</strong></div>
+      <button id="checkoutBtn" class="primary-btn" data-t="place_order">Buyurtma berish</button>
+    </div>
+  </section>
+
+  <section id="checkoutScreen" class="screen hidden">
+    <header class="screen-header">
+      <button class="back-btn" id="checkoutBack" type="button" data-t="back">Orqaga</button>
+      <h2 data-t="checkout_title">📋 Rasmiylashtirish</h2>
+    </header>
+    <div class="form">
+      <label><span data-t="lbl_address">📍 Manzil</span>
+        <input id="inputAddress" type="text" data-t-placeholder="ph_address" placeholder="Yetkazib berish manzili">
+      </label>
+      <label><span data-t="lbl_method">🚚 Usul</span>
+        <div class="seg">
+          <button data-method="delivery" class="seg-btn active" type="button" data-t="m_delivery">🚚 Yetkazib berish</button>
+          <button data-method="pickup" class="seg-btn" type="button" data-t="m_pickup">🚶 Olib ketish</button>
+        </div>
+      </label>
+      <div id="branchLabel" class="hidden">
+        <div class="label" data-t="pick_branch">🏪 Filialni tanlang</div>
+        <div id="branchPicker" class="branch-picker"></div>
+      </div>
+      <label><span data-t="lbl_payment">💳 To'lov turi</span>
+        <div class="seg">
+          <button data-pay="cash" class="seg-btn active" type="button" data-t="p_cash">💵 Naqd</button>
+          <button data-pay="card" class="seg-btn" type="button" data-t="p_card">💳 Karta</button>
+        </div>
+      </label>
+      <label><span data-t="lbl_time">🕐 Vaqt (ixtiyoriy)</span>
+        <input id="inputTime" type="text" data-t-placeholder="ph_time" placeholder='Bo''sh = "hozir"'>
+      </label>
+      <label><span data-t="lbl_promo">🎟 Promokod (ixtiyoriy)</span>
+        <div class="promo-row">
+          <input id="inputPromo" type="text" data-t-placeholder="ph_promo" placeholder="WELCOME10" autocapitalize="characters">
+          <button id="promoBtn" class="ghost-btn" type="button" data-t="apply">Qo'llash</button>
+        </div>
+      </label>
+      <div id="promoMsg" class="promo-msg hidden"></div>
+      <div class="summary">
+        <div class="row"><span data-t="lbl_subtotal">Mahsulotlar:</span><span id="checkoutSubtotal">0</span></div>
+        <div id="checkoutDiscountRow" class="row hidden" style="color:var(--success)"><span data-t="lbl_discount">Chegirma:</span><span id="checkoutDiscount">0</span></div>
+        <div class="row total"><span data-t="lbl_total">Jami:</span><strong id="checkoutTotal">0</strong></div>
+      </div>
+      <button id="submitBtn" class="primary-btn" data-t="confirm">✅ Tasdiqlash</button>
+      <div id="errBox" class="err hidden"></div>
+    </div>
+  </section>
+
+  <section id="payScreen" class="screen hidden">
+    <header class="screen-header">
+      <button class="back-btn" id="payBack" type="button" data-t="back">Orqaga</button>
+      <h2 data-t="pay_title">🎉 Buyurtma qabul qilindi</h2>
+    </header>
+    <div class="form">
+      <div class="success-banner">
+        <div class="success-icon">✅</div>
+        <div><span data-t="order_id">Buyurtma raqami:</span> <strong id="payOrderId">#0</strong></div>
+        <div><span data-t="lbl_total_pay">Summa:</span> <strong id="payAmount">0</strong></div>
+        <div class="hint" data-t="op_will_call">Tez orada operator siz bilan bog'lanadi 🚗</div>
+      </div>
+      <div id="payCardBlock" class="card-display hidden">
+        <div class="card-label" data-t="card_label">💳 Karta raqami</div>
+        <div class="card-number" id="payCardNumber">—</div>
+        <button id="payCardCopy" class="ghost-btn" type="button" data-t="copy">📋 Nusxa olish</button>
+      </div>
+      <button id="payClickBtn" class="primary-btn hidden" style="background:#0099ff"></button>
+      <button id="payPaymeBtn" class="primary-btn hidden" style="background:#1eaa5c"></button>
+      <button id="payAlifBtn"  class="primary-btn hidden" style="background:#8a3ffc"></button>
+      <div id="payNoUrl" class="info hidden"></div>
+      <button id="payCloseBtn" class="primary-btn" data-t="close">Yopish</button>
+    </div>
+  </section>
+
+  <section id="addrScreen" class="screen hidden">
+    <header class="screen-header">
+      <button class="back-btn" id="addrBack" type="button" data-t="back">Orqaga</button>
+      <h2 data-t="addr_title">📍 Manzil tanlash</h2>
+    </header>
+    <div class="form">
+      <button id="useLocBtn" class="primary-btn" data-t="use_current">📍 Joriy joylashuvni yuborish</button>
+      <button id="openMapBtn" class="primary-btn" style="background:#1eaa5c" data-t="pick_on_map">🗺 Xaritada tanlash</button>
+      <div class="divider"><span data-t="or">yoki</span></div>
+      <label><span data-t="enter_manually">✏ Manzilni qo'lda kiriting</span>
+        <input id="addrInput" type="text" data-t-placeholder="ph_addr_manual" placeholder="Masalan: Chilonzor 12-uy">
+      </label>
+      <button id="addrSaveBtn" class="primary-btn" data-t="save_btn">✅ Saqlash</button>
+      <div id="addrDetecting" class="info hidden" data-t="detecting">📍 Manzilni aniqlayapman…</div>
+      <div id="addrErr" class="err hidden"></div>
+    </div>
+  </section>
+
+  <section id="mapScreen" class="screen hidden">
+    <header class="screen-header">
+      <button class="back-btn" id="mapBack" type="button" data-t="back">Orqaga</button>
+      <h2 data-t="map_title">🗺 Manzilni xaritada tanlang</h2>
+    </header>
+    <div id="leafletMap" class="map-container"></div>
+    <div class="map-footer">
+      <div id="mapAddr" class="map-addr" data-t="drag_pin">📍 Pin qo'yish uchun xaritani siljiting</div>
+      <button id="mapSaveBtn" class="primary-btn" data-t="save_this_addr">✅ Shu manzilni saqlash</button>
+    </div>
+  </section>
+
+  <section id="historyScreen" class="screen hidden">
+    <header class="screen-header">
+      <button class="back-btn" id="historyBack" type="button" data-t="back">Orqaga</button>
+      <h2 data-t="history_title">📜 Buyurtmalar tarixi</h2>
+    </header>
+    <div id="historyList" class="content">
+      <div class="loading" data-t="loading">Yuklanmoqda…</div>
+    </div>
+  </section>
+
+  <script>
+    window.STRINGS = {
+      uz: {
+        no_address: "Manzil tanlanmagan", loading: "Yuklanmoqda…", back: "Orqaga",
+        cart_label: "Savatcha", cart_title: "🛒 Savatcha", place_order: "Buyurtma berish",
+        checkout_title: "📋 Rasmiylashtirish",
+        lbl_address: "📍 Manzil", ph_address: "Yetkazib berish manzili",
+        lbl_method: "🚚 Usul", m_delivery: "🚚 Yetkazib berish", m_pickup: "🚶 Olib ketish",
+        pick_branch: "🏪 Filialni tanlang",
+        lbl_payment: "💳 To'lov turi", p_cash: "💵 Naqd", p_card: "💳 Karta",
+        lbl_time: "🕐 Vaqt (ixtiyoriy)", ph_time: "Bo'sh = \"hozir\"",
+        lbl_promo: "🎟 Promokod (ixtiyoriy)", ph_promo: "WELCOME10", apply: "Qo'llash",
+        applying: "Tekshirilmoqda…",
+        lbl_subtotal: "Mahsulotlar:", lbl_discount: "Chegirma:", lbl_total: "Jami:",
+        confirm: "✅ Tasdiqlash", sending: "Yuborilmoqda…",
+        pay_title: "🎉 Buyurtma qabul qilindi", order_id: "Buyurtma raqami:",
+        lbl_total_pay: "Summa:", op_will_call: "Tez orada operator siz bilan bog'lanadi 🚗",
+        card_label: "💳 Karta raqami", copy: "📋 Nusxa olish", copied: "✅ Nusxa olindi",
+        close: "Yopish", history_title: "📜 Buyurtmalar tarixi",
+        addr_title: "📍 Manzil tanlash", use_current: "📍 Joriy joylashuvni yuborish",
+        pick_on_map: "🗺 Xaritada tanlash", or: "yoki",
+        enter_manually: "✏ Manzilni qo'lda kiriting", ph_addr_manual: "Masalan: Chilonzor 12-uy",
+        save_btn: "✅ Saqlash", detecting: "📍 Manzilni aniqlayapman…",
+        map_title: "🗺 Manzilni xaritada tanlang",
+        drag_pin: "📍 Pin qo'yish uchun xaritani siljiting", save_this_addr: "✅ Shu manzilni saqlash",
+        err_addr: "📍 Manzilni kiriting", err_cart_empty: "🛒 Savatcha bo'sh",
+        err_no_init: "⚠️ Botdan 'Buyurtma berish' tugmasi orqali oching",
+        err_server: "Server xato: ", err_geo_unsupported: "⚠️ Brauzeringiz joylashuvni qo'llab-quvvatlamaydi",
+        err_geocode: "Manzilni aniqlab bo'lmadi", err_geo_denied: "Joylashuvga ruxsat berilmadi yoki olib bo'lmadi",
+        err_addr_empty: "Manzilni yozing",
+        promo_ok: "✅ Promokod qo'llandi: {label}", promo_err: "Promokod xato",
+        click_on: "🟦 Click bilan to'lash", click_off: "🟦 Click ilovasini ochish",
+        payme_on: "🟩 Payme bilan to'lash", payme_off: "🟩 Payme ilovasini ochish",
+        alif_on: "🟪 Alif Mobile bilan to'lash", alif_off: "🟪 Alif Mobile ilovasini ochish",
+        no_pay_configured: "ℹ️ Karta to'lov hali sozlanmagan — operator karta raqamini yuboradi.",
+        hist_open_with_bot: "Botdan WebApp tugmasi orqali oching",
+        hist_empty: "Sizda hozircha buyurtmalar yo'q.",
+        hist_label: "Buyurtma", hist_more: "… va yana {n} ta",
+        reorder: "🔄 Qaytadan buyurtma",
+        status_pending: "⏳ Kutilmoqda", status_confirmed: "✅ Tasdiqlangan",
+        status_delivered: "📦 Yetkazilgan", status_cancelled: "❌ Bekor qilingan",
+        soum: "so'm", add_to_cart: "➕ Qo'shish", more_items: "+{n}",
+      },
+      en: {
+        no_address: "No address selected", loading: "Loading…", back: "Back",
+        cart_label: "Cart", cart_title: "🛒 Cart", place_order: "Place order",
+        checkout_title: "📋 Checkout",
+        lbl_address: "📍 Address", ph_address: "Delivery address",
+        lbl_method: "🚚 Method", m_delivery: "🚚 Delivery", m_pickup: "🚶 Pickup",
+        pick_branch: "🏪 Choose a branch",
+        lbl_payment: "💳 Payment", p_cash: "💵 Cash", p_card: "💳 Card",
+        lbl_time: "🕐 Time (optional)", ph_time: "Empty = \"now\"",
+        lbl_promo: "🎟 Promo code (optional)", ph_promo: "WELCOME10", apply: "Apply",
+        applying: "Checking…",
+        lbl_subtotal: "Subtotal:", lbl_discount: "Discount:", lbl_total: "Total:",
+        confirm: "✅ Confirm", sending: "Sending…",
+        pay_title: "🎉 Order accepted", order_id: "Order ID:",
+        lbl_total_pay: "Amount:", op_will_call: "An operator will contact you soon 🚗",
+        card_label: "💳 Card number", copy: "📋 Copy", copied: "✅ Copied",
+        close: "Close", history_title: "📜 Order history",
+        addr_title: "📍 Choose address", use_current: "📍 Use current location",
+        pick_on_map: "🗺 Pick on map", or: "or",
+        enter_manually: "✏ Enter address manually", ph_addr_manual: "E.g.: Chilonzor 12",
+        save_btn: "✅ Save", detecting: "📍 Detecting address…",
+        map_title: "🗺 Pick address on map",
+        drag_pin: "📍 Drag the map to set the pin", save_this_addr: "✅ Save this address",
+        err_addr: "📍 Enter the address", err_cart_empty: "🛒 Cart is empty",
+        err_no_init: "⚠️ Open via the bot's 'Place order' button",
+        err_server: "Server error: ", err_geo_unsupported: "⚠️ Your browser doesn't support geolocation",
+        err_geocode: "Could not detect address", err_geo_denied: "Location access denied or unavailable",
+        err_addr_empty: "Enter an address",
+        promo_ok: "✅ Promo applied: {label}", promo_err: "Invalid promo code",
+        click_on: "🟦 Pay with Click", click_off: "🟦 Open Click app",
+        payme_on: "🟩 Pay with Payme", payme_off: "🟩 Open Payme app",
+        alif_on: "🟪 Pay with Alif Mobile", alif_off: "🟪 Open Alif Mobile",
+        no_pay_configured: "ℹ️ Card payment not configured yet — the operator will send the card number.",
+        hist_open_with_bot: "Open via the WebApp button in the bot",
+        hist_empty: "You have no orders yet.",
+        hist_label: "Order", hist_more: "… and {n} more",
+        reorder: "🔄 Reorder",
+        status_pending: "⏳ Pending", status_confirmed: "✅ Confirmed",
+        status_delivered: "📦 Delivered", status_cancelled: "❌ Cancelled",
+        soum: "so'm", add_to_cart: "➕ Add", more_items: "+{n}",
+      },
+      ru: {
+        no_address: "Адрес не выбран", loading: "Загрузка…", back: "Назад",
+        cart_label: "Корзина", cart_title: "🛒 Корзина", place_order: "Оформить заказ",
+        checkout_title: "📋 Оформление",
+        lbl_address: "📍 Адрес", ph_address: "Адрес доставки",
+        lbl_method: "🚚 Способ", m_delivery: "🚚 Доставка", m_pickup: "🚶 Самовывоз",
+        pick_branch: "🏪 Выберите филиал",
+        lbl_payment: "💳 Оплата", p_cash: "💵 Наличные", p_card: "💳 Карта",
+        lbl_time: "🕐 Время (необязательно)", ph_time: "Пусто = «сейчас»",
+        lbl_promo: "🎟 Промокод (необязательно)", ph_promo: "WELCOME10", apply: "Применить",
+        applying: "Проверка…",
+        lbl_subtotal: "Товары:", lbl_discount: "Скидка:", lbl_total: "Итого:",
+        confirm: "✅ Подтвердить", sending: "Отправка…",
+        pay_title: "🎉 Заказ принят", order_id: "Номер заказа:",
+        lbl_total_pay: "Сумма:", op_will_call: "Оператор скоро свяжется с вами 🚗",
+        card_label: "💳 Номер карты", copy: "📋 Копировать", copied: "✅ Скопировано",
+        close: "Закрыть", history_title: "📜 История заказов",
+        addr_title: "📍 Выбор адреса", use_current: "📍 Использовать моё местоположение",
+        pick_on_map: "🗺 Выбрать на карте", or: "или",
+        enter_manually: "✏ Ввести адрес вручную", ph_addr_manual: "Напр.: Чиланзар 12",
+        save_btn: "✅ Сохранить", detecting: "📍 Определяю адрес…",
+        map_title: "🗺 Выбрать адрес на карте",
+        drag_pin: "📍 Перетащите карту, чтобы поставить точку", save_this_addr: "✅ Сохранить этот адрес",
+        err_addr: "📍 Введите адрес", err_cart_empty: "🛒 Корзина пуста",
+        err_no_init: "⚠️ Откройте через кнопку «Сделать заказ» в боте",
+        err_server: "Ошибка сервера: ", err_geo_unsupported: "⚠️ Ваш браузер не поддерживает геолокацию",
+        err_geocode: "Не удалось определить адрес", err_geo_denied: "Доступ к геолокации запрещён",
+        err_addr_empty: "Введите адрес",
+        promo_ok: "✅ Промокод применён: {label}", promo_err: "Неверный промокод",
+        click_on: "🟦 Оплатить через Click", click_off: "🟦 Открыть приложение Click",
+        payme_on: "🟩 Оплатить через Payme", payme_off: "🟩 Открыть приложение Payme",
+        alif_on: "🟪 Оплатить через Alif Mobile", alif_off: "🟪 Открыть Alif Mobile",
+        no_pay_configured: "ℹ️ Оплата картой ещё не настроена — оператор пришлёт номер карты.",
+        hist_open_with_bot: "Откройте через кнопку WebApp в боте",
+        hist_empty: "У вас пока нет заказов.",
+        hist_label: "Заказ", hist_more: "… и ещё {n}",
+        reorder: "🔄 Повторить заказ",
+        status_pending: "⏳ В ожидании", status_confirmed: "✅ Подтверждён",
+        status_delivered: "📦 Доставлен", status_cancelled: "❌ Отменён",
+        soum: "сум", add_to_cart: "➕ Добавить", more_items: "+{n}",
+      },
+    };
+  </script>
+  <script src="/static/i18n.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>

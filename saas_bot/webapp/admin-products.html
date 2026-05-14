@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0f1115">
+  <title>Products</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="page-title" data-t="page_title">📦 Mahsulotlar</div>
+    <div class="page-sub" id="prodCount">—</div>
+  </header>
+  <main id="content" class="content">
+    <div class="action-row">
+      <button id="addBtn" class="primary-btn" data-t="add_product">➕ Yangi mahsulot</button>
+      <button id="catsBtn" class="ghost-btn" data-t="manage_cats">🗂 Toifalar</button>
+    </div>
+    <div id="list" class="admin-list">
+      <div class="loading" data-t="loading">Yuklanmoqda…</div>
+    </div>
+  </main>
+
+  <!-- Categories management screen -->
+  <section id="catsScreen" class="screen hidden">
+    <header class="screen-header">
+      <button class="back-btn" id="catsBack" type="button" data-t="back">Orqaga</button>
+      <h2 data-t="cats_title">🗂 Toifalar</h2>
+    </header>
+    <div class="form">
+      <div class="add-cat-row">
+        <input id="newCatInput" type="text" data-t-placeholder="new_cat_ph" placeholder="Yangi toifa">
+        <button id="addCatBtn" class="primary-btn" data-t="add_btn">➕ Qo'shish</button>
+      </div>
+      <div class="info" data-t="cat_warn">Toifani o'chirsangiz, undagi BARCHA mahsulotlar ham o'chiriladi.</div>
+      <div id="catsList" class="cats-list"></div>
+      <div id="catsErr" class="err hidden"></div>
+    </div>
+  </section>
+
+  <!-- Edit modal -->
+  <section id="editScreen" class="screen hidden">
+    <header class="screen-header">
+      <button class="back-btn" id="editBack" type="button" data-t="back">Orqaga</button>
+      <h2 id="editTitle" data-t="edit_title">✏ Tahrirlash</h2>
+    </header>
+    <div class="form" id="editForm">
+      <label><span data-t="lbl_name">🍔 Nom</span> <input id="fName" type="text"></label>
+      <label><span data-t="lbl_cat">🗂 Toifa</span>
+        <select id="fCategory"></select>
+      </label>
+      <label><span data-t="lbl_price">💰 Narx (so'm)</span> <input id="fPriceVal" type="number" min="0" step="100"></label>
+      <label><span data-t="lbl_desc">📝 Tavsif</span> <textarea id="fDesc" rows="3"></textarea></label>
+      <label><span data-t="lbl_image">🖼 Rasm URL</span> <input id="fImage" type="url" placeholder="https://..."></label>
+      <button id="saveBtn" class="primary-btn" data-t="save_btn">✅ Saqlash</button>
+      <button id="delBtn" class="ghost-btn" style="border-color:#a23" data-t="del_btn">🗑 O'chirish</button>
+      <div id="formErr" class="err hidden"></div>
+    </div>
+  </section>
+
+  <script>
+    window.STRINGS = {
+      uz: {
+        page_title: "📦 Mahsulotlar", add_product: "➕ Yangi mahsulot", manage_cats: "🗂 Toifalar",
+        loading: "Yuklanmoqda…", back: "Orqaga", cats_title: "🗂 Toifalar",
+        new_cat_ph: "Yangi toifa (masalan: 🥗 Salatlar)", add_btn: "➕ Qo'shish",
+        cat_warn: "Toifani o'chirsangiz, undagi BARCHA mahsulotlar ham o'chiriladi.",
+        edit_title: "✏ Tahrirlash", new_title: "➕ Yangi mahsulot",
+        lbl_name: "🍔 Nom", lbl_cat: "🗂 Toifa", lbl_price: "💰 Narx (so'm)",
+        lbl_desc: "📝 Tavsif", lbl_image: "🖼 Rasm URL",
+        save_btn: "✅ Saqlash", del_btn: "🗑 O'chirish", saving: "Saqlanmoqda…",
+        count: "{n} ta", empty: "Mahsulotlar yo'q.", cats_empty: "Toifalar yo'q.",
+        new_cat_option: "➕ Yangi toifa qo'shish…", prompt_new_cat: "Yangi toifa nomi (emoji bilan):",
+        confirm_del_prod: "{n} o'chirilsinmi?",
+        confirm_del_cat_with: "\"{c}\" toifasini va undagi {n} ta mahsulotni o'chirasizmi?",
+        confirm_del_cat: "\"{c}\" toifasini o'chirasizmi?",
+        err_prefix: "Xato: ", err_cat_name: "Toifa nomini kiriting",
+        err_name: "Nom kerak", err_cat_req: "Toifa kerak", err_price: "Narx 0 dan katta bo'lsin",
+        soum: "so'm", cnt_suffix: "ta",
+      },
+      en: {
+        page_title: "📦 Products", add_product: "➕ New product", manage_cats: "🗂 Categories",
+        loading: "Loading…", back: "Back", cats_title: "🗂 Categories",
+        new_cat_ph: "New category (e.g.: 🥗 Salads)", add_btn: "➕ Add",
+        cat_warn: "Deleting a category removes ALL its products too.",
+        edit_title: "✏ Edit", new_title: "➕ New product",
+        lbl_name: "🍔 Name", lbl_cat: "🗂 Category", lbl_price: "💰 Price (so'm)",
+        lbl_desc: "📝 Description", lbl_image: "🖼 Image URL",
+        save_btn: "✅ Save", del_btn: "🗑 Delete", saving: "Saving…",
+        count: "{n} items", empty: "No products.", cats_empty: "No categories.",
+        new_cat_option: "➕ Add new category…", prompt_new_cat: "New category name (with emoji):",
+        confirm_del_prod: "Delete {n}?",
+        confirm_del_cat_with: "Delete \"{c}\" and its {n} products?",
+        confirm_del_cat: "Delete category \"{c}\"?",
+        err_prefix: "Error: ", err_cat_name: "Enter category name",
+        err_name: "Name required", err_cat_req: "Category required", err_price: "Price must be > 0",
+        soum: "so'm", cnt_suffix: "pcs",
+      },
+      ru: {
+        page_title: "📦 Товары", add_product: "➕ Новый товар", manage_cats: "🗂 Категории",
+        loading: "Загрузка…", back: "Назад", cats_title: "🗂 Категории",
+        new_cat_ph: "Новая категория (напр.: 🥗 Салаты)", add_btn: "➕ Добавить",
+        cat_warn: "Удаление категории удалит ВСЕ её товары.",
+        edit_title: "✏ Редактирование", new_title: "➕ Новый товар",
+        lbl_name: "🍔 Название", lbl_cat: "🗂 Категория", lbl_price: "💰 Цена (сум)",
+        lbl_desc: "📝 Описание", lbl_image: "🖼 URL фото",
+        save_btn: "✅ Сохранить", del_btn: "🗑 Удалить", saving: "Сохранение…",
+        count: "{n} шт", empty: "Нет товаров.", cats_empty: "Нет категорий.",
+        new_cat_option: "➕ Добавить категорию…", prompt_new_cat: "Название категории (с эмодзи):",
+        confirm_del_prod: "Удалить {n}?",
+        confirm_del_cat_with: "Удалить «{c}» и её {n} товаров?",
+        confirm_del_cat: "Удалить категорию «{c}»?",
+        err_prefix: "Ошибка: ", err_cat_name: "Введите название категории",
+        err_name: "Введите название", err_cat_req: "Выберите категорию", err_price: "Цена должна быть > 0",
+        soum: "сум", cnt_suffix: "шт",
+      },
+    };
+  </script>
+  <script src="/static/i18n.js"></script>
+  <script src="/static/admin-products.js"></script>
+</body>
+</html>

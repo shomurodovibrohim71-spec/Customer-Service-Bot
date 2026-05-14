@@ -1,0 +1,22 @@
+services:
+  bot:
+    build: .
+    container_name: saas_bot
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+      - ./config/tenants:/app/config/tenants:ro
+    command: python bot.py
+
+  api:
+    build: .
+    container_name: saas_bot_api
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/app/data
+      - ./config/tenants:/app/config/tenants:ro
+    command: uvicorn api.server:app --host 0.0.0.0 --port 8080

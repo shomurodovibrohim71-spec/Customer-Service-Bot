@@ -1,0 +1,46 @@
+# --- Secrets / env ---------------------------------------------------------
+.env
+.env.*
+*.secret
+
+# --- Python ----------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# --- Project data (per-tenant DBs, logs, generated stuff) ------------------
+saas_bot/data/
+saas_bot/logs/
+saas_bot/tools/
+saas_bot/.venv/
+
+# Downloaded binaries (huge)
+*.exe
+
+# --- IDE / OS --------------------------------------------------------------
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+
+# --- Claude / agents -------------------------------------------------------
+.claude/
+
+# --- Build artifacts -------------------------------------------------------
+build/
+dist/
+node_modules/

@@ -1,0 +1,656 @@
+/* Telegram Mini App for the order flow.
+ * Screens: main (categories+products) -> addr -> cart -> checkout.
+ * Telegram's native BackButton is synced to whichever screen is on top.
+ */
+(() => {
+  const tg = window.Telegram?.WebApp;
+  if (tg) { tg.ready(); tg.expand(); }
+
+  // ----- Launch params ---------------------------------------------------
+  const url = new URL(window.location.href);
+  const startParam = tg?.initDataUnsafe?.start_param || "";
+  const tenantId = startParam || url.searchParams.get("tenant") || "tenant_001";
+  const initData = tg?.initData || "";
+  // Fallback user id from URL (bot passes ?uid=...) when initData is missing.
+  const fallbackUid = parseInt(url.searchParams.get("uid") || "0") || null;
+
+  // ----- State -----------------------------------------------------------
+  const state = {
+    menu: null,
+    activeCategory: null,
+    cart: {},                 // {pid: qty}
+    address: "",
+    addressLat: null,
+    addressLon: null,
+    deliveryType: "delivery",
+    branchId: null,
+    paymentMethod: "cash",
+    promo: null,   // {code, discount, label} | null
+  };
+
+  // Stack of currently open overlay screens. Top of stack = current.
+  // Telegram BackButton pops the top.
+  const screenStack = [];
+
+  // ----- Helpers ---------------------------------------------------------
+  const T = window.T || ((k, f) => f != null ? f : k);
+  const tfmt = (key, vars) => {
+    let s = T(key);
+    for (const [k, v] of Object.entries(vars || {})) s = s.replace("{" + k + "}", v);
+    return s;
+  };
+  const $ = (id) => document.getElementById(id);
+  const fmt = (n) => new Intl.NumberFormat("uz-UZ").format(n) + " " + T("soum");
+  const cartCount = () => Object.values(state.cart).reduce((a, b) => a + b, 0);
+  function cartTotal() {
+    let t = 0;
+    for (const [pid, qty] of Object.entries(state.cart)) {
+      const p = findProduct(parseInt(pid));
+      if (p) t += (p.price_value || 0) * qty;
+    }
+    return t;
+  }
+  function findProduct(pid) {
+    if (!state.menu) return null;
+    for (const items of Object.values(state.menu.products)) {
+      const p = items.find(x => x.id === pid);
+      if (p) return p;
+    }
+    return null;
+  }
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    }[c]));
+  }
+
+  // ----- Screen management ----------------------------------------------
+  function openScreen(id) {
+    $(id).classList.remove("hidden");
+    screenStack.push(id);
+    syncBackButton();
+  }
+  function closeScreen(id) {
+    $(id).classList.add("hidden");
+    const idx = screenStack.lastIndexOf(id);
+    if (idx >= 0) screenStack.splice(idx, 1);
+    syncBackButton();
+  }
+  function syncBackButton() {
+    if (!tg?.BackButton) return;
+    if (screenStack.length > 0) {
+      tg.BackButton.show();
+    } else {
+      tg.BackButton.hide();
+    }
+  }
+  if (tg?.BackButton) {
+    tg.BackButton.onClick(() => {
+      const top = screenStack[screenStack.length - 1];
+      if (top) closeScreen(top);
+    });
+  }
+
+  // ----- Load menu -------------------------------------------------------
+  async function loadMenu() {
+    try {
+      const r = await fetch(`/api/menu?tenant=${encodeURIComponent(tenantId)}`);
+      if (!r.ok) throw new Error("Menu yuklanmadi");
+      state.menu = await r.json();
+      state.activeCategory = state.menu.categories[0] || null;
+      renderTabs();
+      renderProducts();
+      populateBranches();
+    } catch (e) {
+      $("content").innerHTML = `<div class="err">⚠️ ${e.message}</div>`;
+    }
+  }
+
+  function renderTabs() {
+    const tabs = $("tabs");
+    tabs.innerHTML = "";
+    state.menu.categories.forEach(cat => {
+      const btn = document.createElement("button");
+      btn.className = "tab" + (cat === state.activeCategory ? " active" : "");
+      btn.textContent = cat;
+      btn.onclick = () => { state.activeCategory = cat; renderTabs(); renderProducts(); };
+      tabs.appendChild(btn);
+    });
+  }
+
+  function renderProducts() {
+    const content = $("content");
+    content.innerHTML = "";
+    const items = state.menu.products[state.activeCategory] || [];
+    const header = document.createElement("h2");
+    header.className = "cat-header";
+    header.textContent = state.activeCategory;
+    content.appendChild(header);
+
+    const grid = document.createElement("div");
+    grid.className = "products-grid";
+    items.forEach(p => grid.appendChild(productCard(p)));
+    content.appendChild(grid);
+  }
+
+  function productCard(p) {
+    const card = document.createElement("div");
+    card.className = "product-card";
+
+    const img = document.createElement("div");
+    img.className = "product-img";
+    if (p.image_url) img.style.backgroundImage = `url(${p.image_url})`;
+    card.appendChild(img);
+
+    const info = document.createElement("div");
+    info.className = "product-info";
+    info.innerHTML = `<div class="product-price">${fmt(p.price_value)}</div>
+                      <div class="product-name">${escapeHtml(p.name)}</div>`;
+    card.appendChild(info);
+
+    const qty = state.cart[p.id] || 0;
+    if (qty === 0) {
+      const addBtn = document.createElement("button");
+      addBtn.className = "add-btn";
+      addBtn.textContent = T("add_to_cart");
+      addBtn.onclick = () => { state.cart[p.id] = 1; renderProducts(); refreshCartBar(); };
+      card.appendChild(addBtn);
+    } else {
+      const qctrl = document.createElement("div");
+      qctrl.className = "qty";
+      qctrl.innerHTML = `<button data-act="dec">➖</button><span>${qty}</span><button data-act="inc">➕</button>`;
+      qctrl.querySelector('[data-act="dec"]').onclick = () => {
+        state.cart[p.id]--;
+        if (state.cart[p.id] <= 0) delete state.cart[p.id];
+        renderProducts(); refreshCartBar();
+      };
+      qctrl.querySelector('[data-act="inc"]').onclick = () => {
+        state.cart[p.id]++; renderProducts(); refreshCartBar();
+      };
+      card.appendChild(qctrl);
+    }
+    return card;
+  }
+
+  function refreshCartBar() {
+    const bar = $("cartBar");
+    if (cartCount() === 0) {
+      bar.classList.add("hidden");
+      return;
+    }
+    bar.classList.remove("hidden");
+    $("cartCount").textContent = cartCount();
+    $("cartTotal").textContent = fmt(cartTotal());
+  }
+
+  $("cartBar").onclick = () => openCart();
+
+  // ----- Cart screen -----------------------------------------------------
+  function openCart() {
+    openScreen("cartScreen");
+    const list = $("cartItems"); list.innerHTML = "";
+    for (const [pid, qty] of Object.entries(state.cart)) {
+      const p = findProduct(parseInt(pid));
+      if (!p) continue;
+      const row = document.createElement("div");
+      row.className = "cart-item";
+      row.innerHTML = `
+        <div class="name">${escapeHtml(p.name)}<br><small>${fmt(p.price_value * qty)}</small></div>
+        <div class="qty"><button data-act="dec">➖</button><span>${qty}</span><button data-act="inc">➕</button></div>
+      `;
+      row.querySelector('[data-act="dec"]').onclick = () => {
+        state.cart[p.id]--;
+        if (state.cart[p.id] <= 0) delete state.cart[p.id];
+        openCart(); refreshCartBar(); renderProducts();
+      };
+      row.querySelector('[data-act="inc"]').onclick = () => {
+        state.cart[p.id]++; openCart(); refreshCartBar(); renderProducts();
+      };
+      list.appendChild(row);
+    }
+    $("cartSumTotal").textContent = fmt(cartTotal());
+  }
+  $("cartBack").onclick = () => closeScreen("cartScreen");
+
+  // ----- Checkout --------------------------------------------------------
+  function refreshCheckoutTotals() {
+    const subtotal = cartTotal();
+    $("checkoutSubtotal").textContent = fmt(subtotal);
+    const disc = state.promo?.discount || 0;
+    if (disc > 0) {
+      $("checkoutDiscountRow").classList.remove("hidden");
+      $("checkoutDiscount").textContent = "− " + fmt(disc);
+    } else {
+      $("checkoutDiscountRow").classList.add("hidden");
+    }
+    $("checkoutTotal").textContent = fmt(Math.max(0, subtotal - disc));
+  }
+  $("checkoutBtn").onclick = () => {
+    if (cartCount() === 0) return;
+    closeScreen("cartScreen");
+    openScreen("checkoutScreen");
+    $("inputAddress").value = state.address || "";
+    refreshCheckoutTotals();
+  };
+  $("checkoutBack").onclick = () => closeScreen("checkoutScreen");
+
+  // ----- Promo code apply -----------------------------------------------
+  $("promoBtn").onclick = async () => {
+    const code = $("inputPromo").value.trim();
+    const msgEl = $("promoMsg");
+    if (!code) {
+      state.promo = null;
+      msgEl.classList.add("hidden");
+      refreshCheckoutTotals();
+      return;
+    }
+    $("promoBtn").disabled = true;
+    $("promoBtn").textContent = T("applying");
+    try {
+      const r = await fetch("/api/promo/check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          init_data: initData, fallback_uid: fallbackUid, tenant_id: tenantId,
+          code, total: cartTotal(),
+        }),
+      });
+      const data = await r.json();
+      if (!r.ok || !data.ok) {
+        state.promo = null;
+        msgEl.textContent = "⚠️ " + (data.message || T("promo_err"));
+        msgEl.className = "promo-msg promo-err";
+        msgEl.classList.remove("hidden");
+      } else {
+        state.promo = { code, discount: data.discount, label: data.label };
+        msgEl.textContent = tfmt("promo_ok", { label: data.label });
+        msgEl.className = "promo-msg promo-ok";
+        msgEl.classList.remove("hidden");
+        if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
+      }
+      refreshCheckoutTotals();
+    } catch (e) {
+      msgEl.textContent = "⚠️ " + (e.message || T("promo_err"));
+      msgEl.className = "promo-msg promo-err";
+      msgEl.classList.remove("hidden");
+    } finally {
+      $("promoBtn").disabled = false;
+      $("promoBtn").textContent = T("apply");
+    }
+  };
+
+  // Delivery method toggle (group A: data-method)
+  document.querySelectorAll('.seg-btn[data-method]').forEach(b => {
+    b.onclick = () => {
+      document.querySelectorAll('.seg-btn[data-method]').forEach(x => x.classList.remove("active"));
+      b.classList.add("active");
+      state.deliveryType = b.dataset.method;
+      $("branchLabel").classList.toggle("hidden", state.deliveryType !== "pickup");
+    };
+  });
+  // Payment method toggle (group B: data-pay)
+  document.querySelectorAll('.seg-btn[data-pay]').forEach(b => {
+    b.onclick = () => {
+      document.querySelectorAll('.seg-btn[data-pay]').forEach(x => x.classList.remove("active"));
+      b.classList.add("active");
+      state.paymentMethod = b.dataset.pay;
+    };
+  });
+
+  function populateBranches() {
+    if (!state.menu?.branches) return;
+    const picker = $("branchPicker");
+    if (!picker) return;
+    picker.innerHTML = "";
+    state.menu.branches.forEach((b, idx) => {
+      const card = document.createElement("div");
+      card.className = "branch-pick-card" + (idx === 0 ? " selected" : "");
+      card.dataset.id = b.id;
+      card.innerHTML = `
+        <div class="pick-name">${escapeHtml(b.name)}</div>
+        <div class="pick-addr">📍 ${escapeHtml(b.address || "")}</div>
+      `;
+      card.onclick = () => {
+        picker.querySelectorAll(".branch-pick-card").forEach(c => c.classList.remove("selected"));
+        card.classList.add("selected");
+        state.branchId = b.id;
+      };
+      picker.appendChild(card);
+    });
+    if (state.menu.branches.length) state.branchId = state.menu.branches[0].id;
+  }
+
+  // ----- Submit order ----------------------------------------------------
+  $("submitBtn").onclick = async () => {
+    const addr = $("inputAddress").value.trim();
+    const time = $("inputTime").value.trim();
+    if (!addr) { showErr(T("err_addr")); return; }
+    const finalTime = time || "—";
+    if (cartCount() === 0) { showErr(T("err_cart_empty")); return; }
+    if (!initData && !fallbackUid) {
+      showErr(T("err_no_init"));
+      return;
+    }
+
+    const payload = {
+      init_data: initData,
+      fallback_uid: fallbackUid,
+      tenant_id: tenantId,
+      branch_id: state.deliveryType === "pickup" ? state.branchId : null,
+      delivery_type: state.deliveryType,
+      address: addr,
+      address_lat: state.addressLat,
+      address_lon: state.addressLon,
+      preferred_time: finalTime,
+      payment_method: state.paymentMethod,
+      promo_code: state.promo?.code || "",
+      items: Object.entries(state.cart).map(([pid, qty]) => ({ product_id: parseInt(pid), qty }))
+    };
+
+    const submitBtn = $("submitBtn");
+    submitBtn.disabled = true;
+    submitBtn.textContent = T("sending");
+    try {
+      const r = await fetch("/api/order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!r.ok) {
+        const t = await r.text();
+        throw new Error(`${T("err_server")}${r.status} ${t.slice(0, 100)}`);
+      }
+      const data = await r.json();
+      // Show our own success screen so the user has a clear path to close
+      // (Telegram alerts' X button does NOT fire the callback).
+      if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
+      showSuccess(data);
+    } catch (e) {
+      showErr(e.message);
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = T("confirm");
+    }
+  };
+
+  function showSuccess(data) {
+    $("payOrderId").textContent = "#" + data.order_id;
+    $("payAmount").textContent = fmt(data.total);
+
+    const isCard = data.payment_method === "card";
+
+    // Card number block - show if backend sent one.
+    const cardBlock = $("payCardBlock");
+    if (isCard && data.card_number) {
+      cardBlock.classList.remove("hidden");
+      $("payCardNumber").textContent = data.card_number;
+      $("payCardCopy").onclick = async () => {
+        try {
+          await navigator.clipboard.writeText(data.card_number);
+          $("payCardCopy").textContent = T("copied");
+          setTimeout(() => { $("payCardCopy").textContent = T("copy"); }, 2000);
+        } catch { /* clipboard blocked - silent */ }
+      };
+    } else {
+      cardBlock.classList.add("hidden");
+    }
+
+    const setBtn = (btnId, url, configured, labelOn, labelOff) => {
+      const btn = $(btnId);
+      if (isCard && url) {
+        btn.classList.remove("hidden");
+        btn.textContent = configured ? labelOn : labelOff;
+        btn.onclick = () => { tg ? tg.openLink(url) : window.open(url, "_blank"); };
+      } else {
+        btn.classList.add("hidden");
+      }
+    };
+    setBtn("payClickBtn", data.click_url, data.click_configured, T("click_on"), T("click_off"));
+    setBtn("payPaymeBtn", data.payme_url, data.payme_configured, T("payme_on"), T("payme_off"));
+    setBtn("payAlifBtn",  data.alif_url,  data.alif_configured, T("alif_on"),  T("alif_off"));
+
+    const noUrl = $("payNoUrl");
+    const anyConfigured = data.click_configured || data.payme_configured || data.alif_configured;
+    if (isCard && !anyConfigured && !data.card_number) {
+      noUrl.classList.remove("hidden");
+      noUrl.textContent = T("no_pay_configured");
+    } else {
+      noUrl.classList.add("hidden");
+    }
+
+    state.cart = {};
+    refreshCartBar();
+    closeScreen("checkoutScreen");
+    openScreen("payScreen");
+  }
+
+  // Old name kept for compatibility with code that still calls it.
+  function showPaymentChoice(data) { showSuccess(data); }
+
+  function showErr(msg) {
+    const box = $("errBox");
+    box.textContent = msg; box.classList.remove("hidden");
+    setTimeout(() => box.classList.add("hidden"), 4000);
+  }
+
+  // ----- Payment / success screen wiring --------------------------------
+  $("payBack").onclick = () => closeScreen("payScreen");
+  $("payCloseBtn").onclick = () => { if (tg) tg.close(); else closeScreen("payScreen"); };
+
+  // ----- Address picker screen ------------------------------------------
+  $("addrBtn").onclick = () => {
+    $("addrInput").value = state.address && !state.address.startsWith("GPS") ? state.address : "";
+    $("addrErr").classList.add("hidden");
+    $("addrDetecting").classList.add("hidden");
+    openScreen("addrScreen");
+  };
+  $("addrBack").onclick = () => closeScreen("addrScreen");
+
+  $("useLocBtn").onclick = () => {
+    $("addrErr").classList.add("hidden");
+    if (!navigator.geolocation) {
+      addrErr(T("err_geo_unsupported"));
+      return;
+    }
+    $("addrDetecting").classList.remove("hidden");
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude, longitude } = pos.coords;
+        state.addressLat = latitude;
+        state.addressLon = longitude;
+        try {
+          const r = await fetch(`/api/reverse-geocode?lat=${latitude}&lon=${longitude}&lang=uz`);
+          const data = await r.json();
+          const addr = data.address || `GPS ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+          state.address = addr;
+          $("addrText").textContent = addr;
+          $("addrDetecting").classList.add("hidden");
+          closeScreen("addrScreen");
+          if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
+        } catch (e) {
+          $("addrDetecting").classList.add("hidden");
+          addrErr(T("err_geocode"));
+        }
+      },
+      (err) => {
+        $("addrDetecting").classList.add("hidden");
+        addrErr(T("err_geo_denied"));
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
+
+  $("addrSaveBtn").onclick = () => {
+    const txt = $("addrInput").value.trim();
+    if (!txt) { addrErr(T("err_addr_empty")); return; }
+    state.address = txt;
+    state.addressLat = null;
+    state.addressLon = null;
+    $("addrText").textContent = txt;
+    closeScreen("addrScreen");
+  };
+
+  function addrErr(msg) {
+    const box = $("addrErr");
+    box.textContent = "⚠️ " + msg;
+    box.classList.remove("hidden");
+  }
+
+  // ----- Map picker (Leaflet) -------------------------------------------
+  let leafletMap = null;
+  let leafletMarker = null;
+  let mapSelectedLatLon = null;
+  let mapAddrText = "";
+  let geocodeTimer = null;
+
+  $("openMapBtn").onclick = () => {
+    closeScreen("addrScreen");
+    openScreen("mapScreen");
+    // Initialize map on first open. Defaults to Tashkent.
+    setTimeout(() => {
+      if (!leafletMap) {
+        leafletMap = L.map("leafletMap").setView([41.2995, 69.2401], 13);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          maxZoom: 19, attribution: "© OpenStreetMap",
+        }).addTo(leafletMap);
+        leafletMarker = L.marker([41.2995, 69.2401], { draggable: true }).addTo(leafletMap);
+        leafletMarker.on("dragend", onMarkerMove);
+        leafletMap.on("click", (e) => {
+          leafletMarker.setLatLng(e.latlng);
+          onMarkerMove();
+        });
+        onMarkerMove();
+      }
+      // Try to center on user location if known.
+      if (state.addressLat && state.addressLon) {
+        leafletMap.setView([state.addressLat, state.addressLon], 16);
+        leafletMarker.setLatLng([state.addressLat, state.addressLon]);
+        onMarkerMove();
+      } else if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition((pos) => {
+          const { latitude, longitude } = pos.coords;
+          leafletMap.setView([latitude, longitude], 16);
+          leafletMarker.setLatLng([latitude, longitude]);
+          onMarkerMove();
+        }, () => {}, { timeout: 5000 });
+      }
+      // Recompute size after the container becomes visible.
+      leafletMap.invalidateSize();
+    }, 50);
+  };
+
+  function onMarkerMove() {
+    const ll = leafletMarker.getLatLng();
+    mapSelectedLatLon = { lat: ll.lat, lon: ll.lng };
+    $("mapAddr").textContent = `📍 Aniqlanmoqda... (${ll.lat.toFixed(5)}, ${ll.lng.toFixed(5)})`;
+    if (geocodeTimer) clearTimeout(geocodeTimer);
+    geocodeTimer = setTimeout(async () => {
+      try {
+        const r = await fetch(`/api/reverse-geocode?lat=${ll.lat}&lon=${ll.lng}&lang=uz`);
+        const d = await r.json();
+        mapAddrText = d.address || `GPS ${ll.lat.toFixed(5)}, ${ll.lng.toFixed(5)}`;
+        $("mapAddr").textContent = "📍 " + mapAddrText;
+      } catch {
+        mapAddrText = `GPS ${ll.lat.toFixed(5)}, ${ll.lng.toFixed(5)}`;
+        $("mapAddr").textContent = "📍 " + mapAddrText;
+      }
+    }, 400);
+  }
+
+  $("mapBack").onclick = () => { closeScreen("mapScreen"); openScreen("addrScreen"); };
+
+  $("mapSaveBtn").onclick = () => {
+    if (!mapSelectedLatLon) return;
+    state.address = mapAddrText || `GPS ${mapSelectedLatLon.lat.toFixed(5)}, ${mapSelectedLatLon.lon.toFixed(5)}`;
+    state.addressLat = mapSelectedLatLon.lat;
+    state.addressLon = mapSelectedLatLon.lon;
+    $("addrText").textContent = state.address;
+    closeScreen("mapScreen");
+    // also close the addr-picker if still open
+    if (!$("addrScreen").classList.contains("hidden")) closeScreen("addrScreen");
+  };
+
+  // ----- Order history --------------------------------------------------
+  $("historyBtn").onclick = () => { openScreen("historyScreen"); loadHistory(); };
+  $("historyBack").onclick = () => closeScreen("historyScreen");
+
+  async function loadHistory() {
+    const list = $("historyList");
+    list.innerHTML = `<div class="loading">${T("loading")}</div>`;
+    if (!initData && !fallbackUid) {
+      list.innerHTML = `<div class="info">${T("hist_open_with_bot")}</div>`;
+      return;
+    }
+    try {
+      const qs = new URLSearchParams({
+        tenant: tenantId, init_data: initData, uid: fallbackUid || "",
+      });
+      const r = await fetch(`/api/orders/history?${qs}`);
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.detail || T("err_server"));
+      list.innerHTML = "";
+      if (!data.orders.length) {
+        list.innerHTML = `<div class="info">${T("hist_empty")}</div>`;
+        return;
+      }
+      data.orders.forEach(o => list.appendChild(historyCard(o)));
+    } catch (e) {
+      list.innerHTML = `<div class="err">⚠️ ${escapeHtml(e.message)}</div>`;
+    }
+  }
+
+  function statusBadge(status) {
+    const cls = status === "pending"   ? "badge-pending"
+              : status === "cancelled" ? "badge-cancelled"
+              : "badge-confirmed";
+    return `<span class="hist-badge ${cls}">${T("status_" + status, status)}</span>`;
+  }
+
+  function historyCard(o) {
+    const card = document.createElement("article");
+    card.className = "hist-card";
+    const date = (o.created_at || "").replace("T", " ").slice(0, 16);
+    const itemsHtml = (o.items || []).slice(0, 4)
+      .map(it => `<div class="hist-item">• ${escapeHtml(it.name)} × ${it.qty}</div>`)
+      .join("");
+    const moreHtml = (o.items || []).length > 4
+      ? `<div class="hist-item muted">${tfmt("hist_more", { n: o.items.length - 4 })}</div>` : "";
+    const reorderable = (o.items || []).some(it => findProduct(it.product_id));
+    card.innerHTML = `
+      <div class="hist-head">
+        <div>
+          <div class="hist-id">${T("hist_label")} #${o.id}</div>
+          <div class="hist-date">${escapeHtml(date)}</div>
+        </div>
+        ${statusBadge(o.status)}
+      </div>
+      <div class="hist-items">${itemsHtml}${moreHtml}</div>
+      <div class="hist-foot">
+        <strong class="hist-total">${fmt(o.amount)}</strong>
+        ${reorderable ? `<button class="primary-btn reorder-btn">${T("reorder")}</button>` : ''}
+      </div>
+    `;
+    const btn = card.querySelector(".reorder-btn");
+    if (btn) {
+      btn.onclick = () => {
+        let added = 0;
+        for (const it of (o.items || [])) {
+          if (findProduct(it.product_id)) {
+            state.cart[it.product_id] = (state.cart[it.product_id] || 0) + (it.qty || 1);
+            added += it.qty || 1;
+          }
+        }
+        if (!added) return;
+        if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
+        refreshCartBar();
+        renderProducts();
+        closeScreen("historyScreen");
+        openCart();
+      };
+    }
+    return card;
+  }
+
+  // ----- Boot ------------------------------------------------------------
+  loadMenu();
+})();

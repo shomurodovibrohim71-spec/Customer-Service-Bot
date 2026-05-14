@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0f1115">
+  <title>Orders</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="page-title" data-t="page_title">🛒 Buyurtmalar</div>
+    <div class="page-sub" id="totalCount">—</div>
+  </header>
+
+  <nav class="tabs" id="ordTabs">
+    <button class="tab active" data-st="all">
+      <span data-t="tab_all">Hammasi</span> · <span id="cnt_all">0</span>
+    </button>
+    <button class="tab" data-st="pending">
+      <span data-t="tab_pending">⏳ Yangi</span> · <span id="cnt_pending">0</span>
+    </button>
+    <button class="tab" data-st="confirmed">
+      <span data-t="tab_confirmed">✅ Tasdiqlangan</span> · <span id="cnt_confirmed">0</span>
+    </button>
+    <button class="tab" data-st="delivered">
+      <span data-t="tab_delivered">📦 Yetkazilgan</span> · <span id="cnt_delivered">0</span>
+    </button>
+    <button class="tab" data-st="cancelled">
+      <span data-t="tab_cancelled">❌ Bekor</span> · <span id="cnt_cancelled">0</span>
+    </button>
+  </nav>
+
+  <main class="content">
+    <input id="searchInput" class="search-input" type="text" data-t-placeholder="ph_search" placeholder="🔎 ID yoki telefon bo'yicha qidirish…">
+    <div id="list">
+      <div class="loading" data-t="loading">Yuklanmoqda…</div>
+    </div>
+  </main>
+
+  <!-- Detail screen -->
+  <section id="detailScreen" class="screen hidden">
+    <header class="screen-header">
+      <button class="back-btn" id="detailBack" type="button" data-t="back">Orqaga</button>
+      <h2 id="detailTitle">—</h2>
+    </header>
+    <div class="content order-detail">
+      <div id="detailBody"><div class="loading" data-t="loading">Yuklanmoqda…</div></div>
+      <div id="detailErr" class="err hidden"></div>
+    </div>
+  </section>
+
+  <script>
+    window.STRINGS = {
+      uz: {
+        page_title: "🛒 Buyurtmalar", loading: "Yuklanmoqda…", back: "Orqaga",
+        tab_all: "Hammasi", tab_pending: "⏳ Yangi", tab_confirmed: "✅ Tasdiqlangan",
+        tab_delivered: "📦 Yetkazilgan", tab_cancelled: "❌ Bekor",
+        ph_search: "🔎 ID yoki telefon bo'yicha qidirish…",
+        empty: "Bu bo'limda buyurtmalar yo'q.", total_short: "{n} ta",
+        lbl_customer: "👤 Mijoz", lbl_phone: "📞", lbl_branch: "🏪 Filial",
+        lbl_address: "📍 Manzil", lbl_time: "🕐 Vaqt", lbl_payment: "💳 To'lov",
+        lbl_items: "🛒 Mahsulotlar", lbl_total: "💰 Jami", lbl_discount: "🎟 Chegirma",
+        lbl_promo: "Promokod", lbl_placed: "📅 Buyurtma vaqti",
+        pay_cash: "💵 Naqd", pay_card: "💳 Karta",
+        status_pending: "⏳ Kutilmoqda", status_confirmed: "✅ Tasdiqlangan",
+        status_delivered: "📦 Yetkazilgan", status_cancelled: "❌ Bekor qilingan",
+        act_confirm: "✅ Tasdiqlash", act_delivered: "📦 Yetkazildi", act_cancel: "❌ Bekor qilish",
+        confirm_cancel: "Buyurtma #{id} bekor qilinsinmi?",
+        soum: "so'm", x_qty: "× {q}", updated: "✅ Yangilandi", view_details: "📋 Batafsil",
+      },
+      en: {
+        page_title: "🛒 Orders", loading: "Loading…", back: "Back",
+        tab_all: "All", tab_pending: "⏳ New", tab_confirmed: "✅ Confirmed",
+        tab_delivered: "📦 Delivered", tab_cancelled: "❌ Cancelled",
+        ph_search: "🔎 Search by ID or phone…",
+        empty: "No orders in this category.", total_short: "{n}",
+        lbl_customer: "👤 Customer", lbl_phone: "📞", lbl_branch: "🏪 Branch",
+        lbl_address: "📍 Address", lbl_time: "🕐 Time", lbl_payment: "💳 Payment",
+        lbl_items: "🛒 Items", lbl_total: "💰 Total", lbl_discount: "🎟 Discount",
+        lbl_promo: "Promo", lbl_placed: "📅 Placed",
+        pay_cash: "💵 Cash", pay_card: "💳 Card",
+        status_pending: "⏳ Pending", status_confirmed: "✅ Confirmed",
+        status_delivered: "📦 Delivered", status_cancelled: "❌ Cancelled",
+        act_confirm: "✅ Confirm", act_delivered: "📦 Mark delivered", act_cancel: "❌ Cancel",
+        confirm_cancel: "Cancel order #{id}?",
+        soum: "so'm", x_qty: "× {q}", updated: "✅ Updated", view_details: "📋 Details",
+      },
+      ru: {
+        page_title: "🛒 Заказы", loading: "Загрузка…", back: "Назад",
+        tab_all: "Все", tab_pending: "⏳ Новые", tab_confirmed: "✅ Подтверждённые",
+        tab_delivered: "📦 Доставленные", tab_cancelled: "❌ Отменённые",
+        ph_search: "🔎 Поиск по ID или телефону…",
+        empty: "В этой категории заказов нет.", total_short: "{n}",
+        lbl_customer: "👤 Клиент", lbl_phone: "📞", lbl_branch: "🏪 Филиал",
+        lbl_address: "📍 Адрес", lbl_time: "🕐 Время", lbl_payment: "💳 Оплата",
+        lbl_items: "🛒 Товары", lbl_total: "💰 Итого", lbl_discount: "🎟 Скидка",
+        lbl_promo: "Промокод", lbl_placed: "📅 Оформлен",
+        pay_cash: "💵 Наличные", pay_card: "💳 Карта",
+        status_pending: "⏳ В ожидании", status_confirmed: "✅ Подтверждён",
+        status_delivered: "📦 Доставлен", status_cancelled: "❌ Отменён",
+        act_confirm: "✅ Подтвердить", act_delivered: "📦 Доставлен", act_cancel: "❌ Отменить",
+        confirm_cancel: "Отменить заказ #{id}?",
+        soum: "сум", x_qty: "× {q}", updated: "✅ Обновлено", view_details: "📋 Детали",
+      },
+    };
+  </script>
+  <script src="/static/i18n.js"></script>
+  <script src="/static/admin-orders.js"></script>
+</body>
+</html>

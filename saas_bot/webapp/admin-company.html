@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0f1115">
+  <title>Company</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="page-title" data-t="page_title">ℹ️ Biz haqimizda</div>
+    <div class="page-sub" data-t="page_sub">Kompaniya ma'lumotlari</div>
+  </header>
+
+  <main class="content company-form">
+    <div id="errBox" class="err hidden"></div>
+    <div id="okBox" class="promo-msg promo-ok hidden"></div>
+    <div id="loading" class="loading" data-t="loading">Yuklanmoqda…</div>
+
+    <div id="form" class="hidden">
+      <!-- General info section -->
+      <section class="dash-section">
+        <h3 data-t="s_general">🏢 Asosiy ma'lumotlar</h3>
+        <div class="form" style="padding:0; gap:12px">
+          <label><span data-t="f_name">Kompaniya nomi</span>
+            <input id="f_name" type="text" maxlength="80">
+          </label>
+          <label><span data-t="f_tagline">Slogan</span>
+            <input id="f_tagline" type="text" maxlength="120">
+          </label>
+          <label><span data-t="f_about">📝 Tavsif (Biz haqimizda)</span>
+            <textarea id="f_about" rows="5"></textarea>
+          </label>
+        </div>
+      </section>
+
+      <!-- Contact section -->
+      <section class="dash-section">
+        <h3 data-t="s_contact">📞 Aloqa</h3>
+        <div class="form" style="padding:0; gap:12px">
+          <label><span data-t="f_phone">Telefon</span>
+            <input id="f_phone" type="tel" data-t-placeholder="ph_phone" placeholder="+998 90 123 45 67">
+          </label>
+          <label><span data-t="f_address">Asosiy manzil</span>
+            <input id="f_address" type="text" maxlength="200">
+          </label>
+          <label><span data-t="f_hours">🕐 Ish vaqti</span>
+            <input id="f_working_hours" type="text" data-t-placeholder="ph_hours" placeholder="09:00-22:00">
+          </label>
+        </div>
+      </section>
+
+      <!-- Payment section -->
+      <section class="dash-section">
+        <h3 data-t="s_payment">💳 To'lov ma'lumotlari</h3>
+        <div class="form" style="padding:0; gap:12px">
+          <label><span data-t="f_card">Karta raqami (mijozga ko'rsatish uchun)</span>
+            <input id="f_card_number" type="text" data-t-placeholder="ph_card" placeholder="8600 0000 0000 0000">
+          </label>
+          <label><span data-t="f_alif">Alif Mobile telefon raqami</span>
+            <input id="f_alif_phone" type="tel" data-t-placeholder="ph_alif" placeholder="+998 90 123 45 67">
+          </label>
+          <label><span data-t="f_click_m">Click merchant_id</span>
+            <input id="f_click_merchant_id" type="text">
+          </label>
+          <label><span data-t="f_click_s">Click service_id</span>
+            <input id="f_click_service_id" type="text">
+          </label>
+          <label><span data-t="f_payme">Payme merchant_id</span>
+            <input id="f_payme_merchant_id" type="text">
+          </label>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- Sticky save bar -->
+  <div id="saveBar" class="save-bar hidden">
+    <span class="dirty-dot hidden" id="dirtyDot"></span>
+    <span id="saveStatus" class="save-status"></span>
+    <button id="saveBtn" class="primary-btn" data-t="save_btn">✅ Saqlash</button>
+  </div>
+
+  <script>
+    window.STRINGS = {
+      uz: {
+        page_title: "ℹ️ Biz haqimizda", page_sub: "Kompaniya ma'lumotlari",
+        loading: "Yuklanmoqda…",
+        s_general: "🏢 Asosiy ma'lumotlar", s_contact: "📞 Aloqa", s_payment: "💳 To'lov ma'lumotlari",
+        f_name: "Kompaniya nomi", f_tagline: "Slogan",
+        f_about: "📝 Tavsif (Biz haqimizda)",
+        f_phone: "Telefon", f_address: "Asosiy manzil", f_hours: "🕐 Ish vaqti",
+        ph_phone: "+998 90 123 45 67", ph_hours: "09:00-22:00",
+        f_card: "Karta raqami (mijozga ko'rsatish uchun)",
+        f_alif: "Alif Mobile telefon raqami",
+        ph_card: "8600 0000 0000 0000", ph_alif: "+998 90 123 45 67",
+        f_click_m: "Click merchant_id", f_click_s: "Click service_id",
+        f_payme: "Payme merchant_id",
+        save_btn: "✅ Saqlash", saving: "Saqlanmoqda…",
+        saved: "✅ Saqlandi", dirty: "O'zgartirildi — saqlashni unutmang",
+        err_load: "Ma'lumotlar yuklanmadi: ",
+      },
+      en: {
+        page_title: "ℹ️ About us", page_sub: "Company information",
+        loading: "Loading…",
+        s_general: "🏢 General info", s_contact: "📞 Contact", s_payment: "💳 Payment details",
+        f_name: "Company name", f_tagline: "Tagline",
+        f_about: "📝 Description (About us)",
+        f_phone: "Phone", f_address: "Main address", f_hours: "🕐 Working hours",
+        ph_phone: "+998 90 123 45 67", ph_hours: "09:00-22:00",
+        f_card: "Card number (shown to customers)",
+        f_alif: "Alif Mobile phone",
+        ph_card: "8600 0000 0000 0000", ph_alif: "+998 90 123 45 67",
+        f_click_m: "Click merchant_id", f_click_s: "Click service_id",
+        f_payme: "Payme merchant_id",
+        save_btn: "✅ Save", saving: "Saving…",
+        saved: "✅ Saved", dirty: "Edited — don't forget to save",
+        err_load: "Failed to load: ",
+      },
+      ru: {
+        page_title: "ℹ️ О компании", page_sub: "Информация о компании",
+        loading: "Загрузка…",
+        s_general: "🏢 Основное", s_contact: "📞 Контакты", s_payment: "💳 Платежи",
+        f_name: "Название компании", f_tagline: "Слоган",
+        f_about: "📝 Описание (О нас)",
+        f_phone: "Телефон", f_address: "Главный адрес", f_hours: "🕐 Часы работы",
+        ph_phone: "+998 90 123 45 67", ph_hours: "09:00-22:00",
+        f_card: "Номер карты (показывается клиенту)",
+        f_alif: "Телефон Alif Mobile",
+        ph_card: "8600 0000 0000 0000", ph_alif: "+998 90 123 45 67",
+        f_click_m: "Click merchant_id", f_click_s: "Click service_id",
+        f_payme: "Payme merchant_id",
+        save_btn: "✅ Сохранить", saving: "Сохранение…",
+        saved: "✅ Сохранено", dirty: "Изменено — не забудьте сохранить",
+        err_load: "Не удалось загрузить: ",
+      },
+    };
+  </script>
+  <script src="/static/i18n.js"></script>
+  <script src="/static/admin-company.js"></script>
+</body>
+</html>

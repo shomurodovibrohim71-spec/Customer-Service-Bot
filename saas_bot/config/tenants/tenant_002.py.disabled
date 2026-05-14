@@ -1,0 +1,68 @@
+"""Sample tenant configuration: a dental clinic."""
+from __future__ import annotations
+
+import os
+
+CONFIG = {
+    "id": "tenant_002",
+    "bot_token": os.getenv("TENANT_002_TOKEN", ""),
+    "name": "SmileCare Dental Clinic",
+    "tagline": "Sog'lom tabassum - baxtli hayot",
+    "language": "uz",
+    "system_prompt": (
+        "Siz {name} stomatologiya klinikasining yordamchisisiz. "
+        "Mijozlarga muolajalar, narxlar va qabulga yozilish haqida malumot bering. "
+        "Xizmatlar: {services}. Ish vaqti: {working_hours}. Manzil: {address}. "
+        "Doim Ozbek tilida, ishonchli va xushmuomalalik bilan javob bering. "
+        "Tibbiy tashxis qoymang - faqat tanishuv qabuli taklif qiling."
+    ),
+    "about": "SmileCare - zamonaviy uskunalar va tajribali shifokorlar bilan stomatologiya klinikasi.",
+    "services": [
+        {"name": "Konsultatsiya", "price": "50,000 so'm", "description": "Birinchi tashrif"},
+        {"name": "Tish davolash (karies)", "price": "300,000 so'm", "description": "Pломба bilan"},
+        {"name": "Tish olib tashlash", "price": "200,000 so'm", "description": "Anesteziya bilan"},
+        {"name": "Tish oqartirish", "price": "800,000 so'm", "description": "Professional"},
+        {"name": "Implant", "price": "5,000,000 so'm", "description": "Premium materiallar"},
+    ],
+    "working_hours": "Du-Shan 09:00-19:00, Yakshanba dam olish",
+    "address": "Toshkent, Chilonzor tumani, Bunyodkor ko'chasi 10",
+    "phone": "+998935554433",
+    "admin_ids": [int(x) for x in os.getenv("TENANT_002_ADMINS", "").split(",") if x.strip().isdigit()] or [123456789],
+    "menu_buttons": [
+        {"text": "Xizmatlar", "callback": "services"},
+        {"text": "Aloqa", "callback": "contact"},
+        {"text": "Manzil", "callback": "location"},
+        {"text": "Ish vaqti", "callback": "hours"},
+        {"text": "Qabulga yozilish", "callback": "order"},
+        {"text": "AI suhbat", "callback": "ai_chat"},
+    ],
+    "quick_replies": {
+        "services": "*Xizmatlar va narxlar:*\n\n{services_formatted}",
+        "contact": "*Aloqa:*\n\nTelefon: {phone}",
+        "location": "*Manzilimiz:*\n\n{address}",
+        "hours": "*Ish vaqti:*\n\n{working_hours}",
+    },
+    "messages": {
+        "welcome": (
+            "Assalomu alaykum, {user_name}!\n\n"
+            "*{name}*ga xush kelibsiz.\n_{tagline}_\n\n"
+            "Quyidagi menyudan tanlang:"
+        ),
+        "main_menu": "Asosiy menyu:",
+        "ai_chat_start": "Savolingizni yozing, men yordam beraman.",
+        "order_ask_name": "Ismingiz va familiyangizni kiriting:",
+        "order_ask_phone": "Telefon raqamingizni kiriting:",
+        "order_ask_service": "Qaysi xizmat uchun yozilmoqchisiz?",
+        "order_ask_date": "Qaysi sana va vaqtga? (masalan: 15.05 14:00)",
+        "order_confirm": (
+            "*Yozuv ma'lumotlari:*\n\n"
+            "Ism: {full_name}\nTelefon: {phone}\n"
+            "Xizmat: {service}\nVaqt: {preferred_time}\n\n"
+            "Tasdiqlaysizmi?"
+        ),
+        "order_success": "Yozildingiz! #{order_id}\nOperator tez orada bog'lanadi.",
+        "order_cancel": "Bekor qilindi.",
+        "invalid_phone": "Noto'g'ri raqam. Qayta kiriting:",
+        "not_admin": "Admin huquqlari yo'q.",
+    },
+}

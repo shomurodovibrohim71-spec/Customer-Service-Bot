@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0f1115">
+  <title>Promo</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="page-title" data-t="page_title">🎟 Promokodlar</div>
+    <div class="page-sub" id="promoCount">—</div>
+  </header>
+
+  <main class="content">
+    <button id="addBtn" class="primary-btn" data-t="add_btn">➕ Yangi promokod</button>
+    <div id="list" style="margin-top:14px">
+      <div class="loading" data-t="loading">Yuklanmoqda…</div>
+    </div>
+  </main>
+
+  <section id="addScreen" class="screen hidden">
+    <header class="screen-header">
+      <button class="back-btn" id="addBack" type="button" data-t="back">Orqaga</button>
+      <h2 data-t="add_title">➕ Yangi promokod</h2>
+    </header>
+    <div class="form">
+      <label>
+        <span data-t="lbl_code">🎟 Kod</span>
+        <input id="fCode" type="text" data-t-placeholder="ph_code" placeholder="Masalan: WELCOME10" autocapitalize="characters" maxlength="32">
+      </label>
+      <label>
+        <span data-t="lbl_type">Chegirma turi</span>
+        <div class="seg disc-seg">
+          <button data-type="percent" class="seg-btn active" type="button" data-t="type_percent">% Foiz</button>
+          <button data-type="fixed"   class="seg-btn" type="button" data-t="type_fixed">Belgilangan</button>
+        </div>
+      </label>
+      <label>
+        <span><span data-t="lbl_value">📉 Chegirma qiymati</span> <span id="fValueHint" class="muted" style="opacity:0.5"></span></span>
+        <input id="fValue" type="number" min="1" value="10">
+      </label>
+      <label>
+        <span data-t="lbl_max">🔢 Maksimal foydalanish (0 = cheksiz)</span>
+        <input id="fMax" type="number" min="0" value="0">
+      </label>
+      <label>
+        <span data-t="lbl_expires">📅 Tugash sanasi (ixtiyoriy, YYYY-MM-DD)</span>
+        <input id="fExpires" type="date">
+      </label>
+      <button id="saveBtn" class="primary-btn" data-t="save_btn">✅ Saqlash</button>
+      <div id="formErr" class="err hidden"></div>
+    </div>
+  </section>
+
+  <script>
+    window.STRINGS = {
+      uz: {
+        page_title: "🎟 Promokodlar", add_btn: "➕ Yangi promokod", back: "Orqaga",
+        add_title: "➕ Yangi promokod", loading: "Yuklanmoqda…",
+        lbl_code: "🎟 Kod", ph_code: "Masalan: WELCOME10",
+        lbl_type: "Chegirma turi", type_percent: "% Foiz", type_fixed: "Belgilangan",
+        lbl_value: "📉 Chegirma qiymati", hint_percent: "(1–100)", hint_fixed: "(so'mda)",
+        lbl_max: "🔢 Maksimal foydalanish (0 = cheksiz)",
+        lbl_expires: "📅 Tugash sanasi (ixtiyoriy, YYYY-MM-DD)",
+        save_btn: "✅ Saqlash", saving: "Saqlanmoqda…",
+        count: "{n} ta faol", empty: "Promokodlar yo'q. ➕ tugmasi bilan qo'shing.",
+        used_max: "{u}/{m} marta ishlatilgan", used_only: "{u} marta ishlatilgan",
+        no_expiry: "♾ Muddatsiz", percent_label: "{v}% chegirma", fixed_label: "{v} so'm chegirma",
+        confirm_del: "{c} promokodini o'chirasizmi?", err_prefix: "Xato: ",
+        err_code: "Kod kerak", err_value: "Chegirma 0 dan katta bo'lsin",
+        err_pct: "Foiz 100 dan katta bo'lmasin",
+      },
+      en: {
+        page_title: "🎟 Promo codes", add_btn: "➕ New promo code", back: "Back",
+        add_title: "➕ New promo code", loading: "Loading…",
+        lbl_code: "🎟 Code", ph_code: "E.g.: WELCOME10",
+        lbl_type: "Discount type", type_percent: "% Percent", type_fixed: "Fixed",
+        lbl_value: "📉 Discount value", hint_percent: "(1–100)", hint_fixed: "(in so'm)",
+        lbl_max: "🔢 Max uses (0 = unlimited)",
+        lbl_expires: "📅 Expiry date (optional, YYYY-MM-DD)",
+        save_btn: "✅ Save", saving: "Saving…",
+        count: "{n} active", empty: "No promo codes. Tap ➕ to add one.",
+        used_max: "used {u}/{m} times", used_only: "used {u} times",
+        no_expiry: "♾ No expiry", percent_label: "{v}% off", fixed_label: "{v} so'm off",
+        confirm_del: "Delete promo code \"{c}\"?", err_prefix: "Error: ",
+        err_code: "Code required", err_value: "Discount must be > 0",
+        err_pct: "Percent must be ≤ 100",
+      },
+      ru: {
+        page_title: "🎟 Промокоды", add_btn: "➕ Новый промокод", back: "Назад",
+        add_title: "➕ Новый промокод", loading: "Загрузка…",
+        lbl_code: "🎟 Код", ph_code: "Например: WELCOME10",
+        lbl_type: "Тип скидки", type_percent: "% Процент", type_fixed: "Фиксированная",
+        lbl_value: "📉 Размер скидки", hint_percent: "(1–100)", hint_fixed: "(в сумах)",
+        lbl_max: "🔢 Макс. использований (0 = безлимит)",
+        lbl_expires: "📅 Срок действия (опц., ГГГГ-ММ-ДД)",
+        save_btn: "✅ Сохранить", saving: "Сохранение…",
+        count: "{n} активных", empty: "Промокодов нет. Нажмите ➕ чтобы добавить.",
+        used_max: "использован {u}/{m} раз", used_only: "использован {u} раз",
+        no_expiry: "♾ Без срока", percent_label: "скидка {v}%", fixed_label: "скидка {v} сум",
+        confirm_del: "Удалить промокод \"{c}\"?", err_prefix: "Ошибка: ",
+        err_code: "Введите код", err_value: "Скидка должна быть > 0",
+        err_pct: "Процент должен быть ≤ 100",
+      },
+    };
+  </script>
+  <script src="/static/i18n.js"></script>
+  <script src="/static/admin-promos.js"></script>
+</body>
+</html>

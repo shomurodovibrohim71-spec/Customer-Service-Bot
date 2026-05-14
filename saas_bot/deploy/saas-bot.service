@@ -1,0 +1,26 @@
+[Unit]
+Description=SaaS Telegram Bot Platform
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=botuser
+Group=botuser
+WorkingDirectory=/opt/saas_bot
+EnvironmentFile=/opt/saas_bot/.env
+ExecStart=/opt/saas_bot/.venv/bin/python /opt/saas_bot/bot.py
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:/var/log/saas_bot/bot.log
+StandardError=append:/var/log/saas_bot/bot.err.log
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/saas_bot/data /var/log/saas_bot
+
+[Install]
+WantedBy=multi-user.target
