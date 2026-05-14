@@ -641,6 +641,35 @@ textarea { width: 100%; resize: vertical; min-height: 80px; }
 .modal-addr { font-weight: 800; font-size: 16px; }
 
 /* =========================================================================
+   Extend-mode banner (when adding items to an existing pending order)
+   ========================================================================= */
+.extend-banner {
+  position: sticky; top: 0; z-index: 7;
+  background: var(--brand-grad);
+  color: #fff;
+  padding: 10px 14px;
+  display: flex; align-items: center; gap: 8px;
+  font-weight: 700; font-size: 14px;
+  box-shadow: var(--sh-md);
+}
+.extend-cancel {
+  margin-left: auto; flex: 0 0 auto;
+  background: rgba(0,0,0,0.25);
+  color: #fff; border: none;
+  width: 28px; height: 28px; border-radius: 50%;
+  font-size: 14px; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: transform var(--dur) var(--ease);
+}
+.extend-cancel:active { transform: scale(0.9); }
+
+/* History actions row (extend + cancel buttons within 2-min window) */
+.hist-actions {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px;
+}
+.hist-actions .ghost-btn { margin: 0; padding: 9px; font-size: 12px; }
+
+/* =========================================================================
    Promo code (in checkout)
    ========================================================================= */
 .promo-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; }

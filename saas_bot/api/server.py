@@ -471,6 +471,122 @@ async def api_orders_history(
     return {"orders": orders}
 
 
+# ========================================================== Primary address
+
+@app.get("/api/user/primary-address")
+async def api_user_primary_address(
+    tenant: str, init_data: str = "", uid: int | None = None,
+) -> dict[str, Any]:
+    """Return the customer's most recently saved address (used by the order
+    WebApp to pre-fill the 'Shu manzilga buyurtma berilsinmi?' prompt)."""
+    t = get_tenant(tenant)
+    user_id = _resolve_user(t, init_data, uid)
+    db = get_db(tenant)
+    addrs = await db.list_addresses(user_id)
+    if not addrs:
+        return {"address": None}
+    # Newest first — list_addresses orders by id ascending, so take last.
+    a = addrs[-1]
+    return {"address": {
+        "id": a["id"], "text": a.get("text") or "",
+        "lat": a.get("lat"), "lon": a.get("lon"),
+    }}
+
+
+# ============================================================ Order extend
+
+class OrderExtendIn(BaseModel):
+    init_data: str = ""
+    fallback_uid: int | None = None
+    tenant_id: str
+    order_id: int
+    items: list[OrderItem]
+
+
+# Same 2-minute window as self-cancel.
+_USER_EXTEND_WINDOW_SECONDS = 120
+
+
+@app.post("/api/orders/extend")
+async def api_user_extend_order(payload: OrderExtendIn) -> dict[str, Any]:
+    """Append items to a still-pending order within the 2-minute window."""
+    from datetime import datetime as _dt
+    import json as _json
+    t = get_tenant(payload.tenant_id)
+    user_id = _resolve_user(t, payload.init_data, payload.fallback_uid)
+    db = get_db(payload.tenant_id)
+    order = await db.get_order(payload.order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="order not found")
+    if int(order["user_id"]) != user_id:
+        raise HTTPException(status_code=403, detail="not your order")
+    if order.get("status") != "pending":
+        raise HTTPException(status_code=400, detail="too_late_status")
+    try:
+        created = _dt.fromisoformat((order.get("created_at") or "").replace("Z", ""))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=500, detail="bad timestamp")
+    elapsed = (_dt.utcnow() - created).total_seconds()
+    if elapsed > _USER_EXTEND_WINDOW_SECONDS:
+        raise HTTPException(status_code=400, detail="too_late_window")
+    if not payload.items:
+        raise HTTPException(status_code=400, detail="empty extend")
+
+    # Re-fetch product prices server-side; never trust the client for amounts.
+    products = {p["id"]: p for p in await db.list_products()}
+    add_items: list[dict[str, Any]] = []
+    add_amount = 0
+    add_lines: list[str] = []
+    for it in payload.items:
+        p = products.get(it.product_id)
+        if not p:
+            continue
+        price = int(p.get("price_value") or 0)
+        add_amount += price * it.qty
+        add_items.append({"product_id": it.product_id, "name": p["name"],
+                          "qty": it.qty, "price": price})
+        add_lines.append(f"{p['name']} × {it.qty} = {price * it.qty:,}")
+    if not add_items:
+        raise HTTPException(status_code=400, detail="no valid items")
+
+    # Merge with existing items_json.
+    existing_items = []
+    raw = order.get("items_json") or ""
+    if raw:
+        try:
+            existing_items = _json.loads(raw)
+        except (_json.JSONDecodeError, ValueError):
+            existing_items = []
+    merged = existing_items + add_items
+    new_amount = int(order.get("amount") or 0) + add_amount
+    new_service = (order.get("service") or "") + " | + " + "; ".join(add_lines)
+
+    # Direct update — Database has no bulk-update helper for orders.
+    await db.conn.execute(
+        """UPDATE orders SET items_json=?, amount=?, service=?
+           WHERE id=? AND tenant_id=?""",
+        (_json.dumps(merged, ensure_ascii=False), new_amount, new_service,
+         payload.order_id, payload.tenant_id),
+    )
+    await db.conn.commit()
+
+    # Notify admins about the supplement.
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            for admin_id in t.admin_ids:
+                await client.post(
+                    f"https://api.telegram.org/bot{t.bot_token}/sendMessage",
+                    json={"chat_id": admin_id,
+                          "text": (f"➕ Buyurtma #{payload.order_id} ga qo'shimcha "
+                                   f"kelidi:\n" + "\n".join(add_lines) +
+                                   f"\n\n💰 Yangi jami: {new_amount:,} so'm"),
+                          "parse_mode": "Markdown"},
+                )
+    except httpx.HTTPError as exc:
+        logger.warning("[%s] extend notify failed: %s", t.id, exc)
+    return {"ok": True, "order_id": payload.order_id, "new_total": new_amount}
+
+
 # ============================================================ Self-cancel
 
 class UserCancelOrderIn(BaseModel):

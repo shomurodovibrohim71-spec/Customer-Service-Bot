@@ -176,6 +176,25 @@
     </div>
   </section>
 
+  <!-- Address confirm modal — shown on entry when a primary address exists -->
+  <div id="addrConfirm" class="modal hidden">
+    <div class="modal-card">
+      <div style="font-size:42px;line-height:1;margin-bottom:6px">📍</div>
+      <p data-t="addr_confirm_q">Shu manzilga buyurtma berilsinmi?</p>
+      <p id="addrConfirmText" class="modal-addr">—</p>
+      <div style="display:flex;gap:10px;margin-top:14px">
+        <button id="addrConfirmNo"  class="ghost-btn"   type="button" data-t="addr_no">✏ Boshqa manzil</button>
+        <button id="addrConfirmYes" class="primary-btn" type="button" data-t="addr_yes">✅ Ha, shu yerga</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Extend-mode banner (shown when opened with ?extend=ID) -->
+  <div id="extendBanner" class="extend-banner hidden">
+    <span data-t="extend_label">➕ Buyurtma #</span><span id="extendOrderId">0</span> <span data-t="extend_to">ga qo'shimcha</span>
+    <button id="extendCancel" class="extend-cancel" type="button" data-t="extend_back">✕</button>
+  </div>
+
   <section id="historyScreen" class="screen hidden">
     <header class="screen-header">
       <button class="back-btn" id="historyBack" type="button" data-t="back">Orqaga</button>
@@ -235,6 +254,12 @@
         status_pending: "⏳ Kutilmoqda", status_confirmed: "✅ Tasdiqlangan",
         status_delivered: "📦 Yetkazilgan", status_cancelled: "❌ Bekor qilingan",
         soum: "so'm", add_to_cart: "➕ Qo'shish", more_items: "+{n}",
+        addr_confirm_q: "Shu manzilga buyurtma berilsinmi?",
+        addr_yes: "✅ Ha, shu yerga", addr_no: "✏ Boshqa manzil",
+        extend_label: "➕ Buyurtma #", extend_to: "ga qo'shimcha",
+        extend_back: "✕",
+        extend_btn: "➕ Qo'shimcha qo'shish",
+        extend_added: "✅ Qo'shildi!",
       },
       en: {
         co_where: "📍 Where to", lbl_price_details: "🧾 Price details",
@@ -283,6 +308,12 @@
         status_pending: "⏳ Pending", status_confirmed: "✅ Confirmed",
         status_delivered: "📦 Delivered", status_cancelled: "❌ Cancelled",
         soum: "so'm", add_to_cart: "➕ Add", more_items: "+{n}",
+        addr_confirm_q: "Order to this address?",
+        addr_yes: "✅ Yes, here", addr_no: "✏ Different address",
+        extend_label: "➕ Adding to order #", extend_to: "",
+        extend_back: "✕",
+        extend_btn: "➕ Add more items",
+        extend_added: "✅ Added!",
       },
       ru: {
         co_where: "📍 Куда", lbl_price_details: "🧾 Детали цены",
@@ -331,6 +362,12 @@
         status_pending: "⏳ В ожидании", status_confirmed: "✅ Подтверждён",
         status_delivered: "📦 Доставлен", status_cancelled: "❌ Отменён",
         soum: "сум", add_to_cart: "➕ Добавить", more_items: "+{n}",
+        addr_confirm_q: "Заказ на этот адрес?",
+        addr_yes: "✅ Да, сюда", addr_no: "✏ Другой адрес",
+        extend_label: "➕ Дополнение к заказу #", extend_to: "",
+        extend_back: "✕",
+        extend_btn: "➕ Добавить ещё",
+        extend_added: "✅ Добавлено!",
       },
     };
   </script>

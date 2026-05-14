@@ -13,6 +13,9 @@
   const initData = tg?.initData || "";
   // Fallback user id from URL (bot passes ?uid=...) when initData is missing.
   const fallbackUid = parseInt(url.searchParams.get("uid") || "0") || null;
+  // 'extend mode' — adding items to an existing pending order rather than
+  // placing a new one.
+  const extendOrderId = parseInt(url.searchParams.get("extend") || "0") || null;
 
   // ----- State -----------------------------------------------------------
   const state = {
@@ -101,9 +104,46 @@
       renderTabs();
       renderProducts();
       populateBranches();
+      // Set up extend mode and the saved-address prompt after menu is ready.
+      if (extendOrderId) {
+        $("extendBanner").classList.remove("hidden");
+        $("extendOrderId").textContent = extendOrderId;
+      } else {
+        await maybeShowAddressConfirm();
+      }
     } catch (e) {
       $("content").innerHTML = `<div class="err">⚠️ ${e.message}</div>`;
     }
+  }
+
+  // ----- Saved-address confirmation modal --------------------------------
+  async function maybeShowAddressConfirm() {
+    if (state.address) return;  // user already picked one (shouldn't happen on fresh load)
+    if (!initData && !fallbackUid) return;
+    try {
+      const qs = new URLSearchParams({
+        tenant: tenantId, init_data: initData, uid: fallbackUid || "",
+      });
+      const r = await fetch(`/api/user/primary-address?${qs}`);
+      if (!r.ok) return;
+      const data = await r.json();
+      const a = data.address;
+      if (!a || !a.text || a.text.startsWith("GPS ")) return;
+      $("addrConfirmText").textContent = a.text;
+      $("addrConfirm").classList.remove("hidden");
+      $("addrConfirmYes").onclick = () => {
+        state.address = a.text;
+        state.addressLat = a.lat || null;
+        state.addressLon = a.lon || null;
+        $("addrText").textContent = a.text;
+        $("addrConfirm").classList.add("hidden");
+        if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
+      };
+      $("addrConfirmNo").onclick = () => {
+        $("addrConfirm").classList.add("hidden");
+        openScreen("addrScreen");
+      };
+    } catch { /* silent — modal is purely a UX nicety */ }
   }
 
   function renderTabs() {
@@ -360,6 +400,32 @@
     submitBtn.disabled = true;
     submitBtn.textContent = T("sending");
     try {
+      // Extend mode: append the items to an existing pending order instead
+      // of creating a new one. Skips address/payment fields (already set on
+      // the original order).
+      if (extendOrderId) {
+        const rx = await fetch("/api/orders/extend", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            init_data: initData, fallback_uid: fallbackUid,
+            tenant_id: tenantId, order_id: extendOrderId,
+            items: payload.items,
+          }),
+        });
+        const dx = await rx.json();
+        if (!rx.ok) throw new Error(dx.detail || `${rx.status}`);
+        if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
+        state.cart = {};
+        refreshCartBar();
+        if (tg) {
+          alert(T("extend_added"));
+          tg.close();
+        } else {
+          closeScreen("checkoutScreen");
+        }
+        return;
+      }
       const r = await fetch("/api/order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -579,6 +645,11 @@
     if (!$("addrScreen").classList.contains("hidden")) closeScreen("addrScreen");
   };
 
+  // Extend-banner cancel (X) — closes the WebApp.
+  $("extendCancel")?.addEventListener("click", () => {
+    if (tg) tg.close();
+  });
+
   // ----- Order history --------------------------------------------------
   $("historyBtn").onclick = () => { openScreen("historyScreen"); loadHistory(); };
   $("historyBack").onclick = () => closeScreen("historyScreen");
@@ -650,10 +721,26 @@
         ${reorderable ? `<button class="primary-btn reorder-btn">${T("reorder")}</button>` : ''}
       </div>
       ${cancelSec ? `
-        <button class="ghost-btn cancel-btn" style="border-color:var(--danger);color:var(--danger);margin-top:6px">
-          ${T("cancel_btn")} <span class="cancel-cd">${cancelSec}s</span>
-        </button>` : ""}
+        <div class="hist-actions">
+          <button class="ghost-btn extend-btn">${T("extend_btn")}</button>
+          <button class="ghost-btn cancel-btn" style="border-color:var(--danger);color:var(--danger)">
+            ${T("cancel_btn")} <span class="cancel-cd">${cancelSec}s</span>
+          </button>
+        </div>` : ""}
     `;
+    const xbtn = card.querySelector(".extend-btn");
+    if (xbtn) {
+      xbtn.onclick = () => {
+        // Open this WebApp again in extend mode by appending ?extend=ID.
+        const u = new URL(window.location.href);
+        u.searchParams.set("extend", String(o.id));
+        if (tg) {
+          tg.openLink ? tg.openLink(u.toString()) : (window.location.href = u.toString());
+        } else {
+          window.location.href = u.toString();
+        }
+      };
+    }
     const cbtn = card.querySelector(".cancel-btn");
     if (cbtn) {
       // Live countdown so the button disappears at 0.

@@ -213,8 +213,23 @@ async def phone_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         raise ApplicationHandlerStop()
 
     await db.set_phone(user.id, phone)
-    await _send_main_menu_for(msg.chat_id, context, tenant, lang)
-    # Stop further handlers from processing this message.
+    # If they have never shared a location, add a one-time hint to the welcome
+    # screen so they save it now — checkout will auto-fill it next time.
+    existing_addrs = await db.list_addresses(user.id)
+    user_view = context.user_data.get("user_view", False)
+    is_admin = tenant.is_admin(user.id) and not user_view
+    if is_admin:
+        text = tenant.admin_t(lang, "admin_welcome")
+        kb = admin_reply_keyboard(tenant, lang)
+    else:
+        text = tenant.t(lang, "registered")
+        if not existing_addrs:
+            text += "\n\n" + tenant.t(lang, "geo_onboarding_hint")
+        kb = main_reply_keyboard(tenant, lang)
+    await context.bot.send_message(
+        chat_id=msg.chat_id, text=text,
+        parse_mode=ParseMode.MARKDOWN, reply_markup=kb,
+    )
     raise ApplicationHandlerStop()
 
 
