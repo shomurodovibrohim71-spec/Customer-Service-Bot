@@ -15,11 +15,11 @@
   </header>
 
   <nav class="tabs" id="ordTabs">
-    <button class="tab active" data-st="all">
-      <span data-t="tab_all">Hammasi</span> · <span id="cnt_all">0</span>
+    <button class="tab active" data-st="today">
+      <span data-t="tab_today">🟢 Bugun</span> · <span id="cnt_today">0</span>
     </button>
-    <button class="tab" data-st="pending">
-      <span data-t="tab_pending">⏳ Yangi</span> · <span id="cnt_pending">0</span>
+    <button class="tab" data-st="all">
+      <span data-t="tab_all">Hammasi</span> · <span id="cnt_all">0</span>
     </button>
     <button class="tab" data-st="confirmed">
       <span data-t="tab_confirmed">✅ Tasdiqlangan</span> · <span id="cnt_confirmed">0</span>
@@ -55,7 +55,8 @@
     window.STRINGS = {
       uz: {
         page_title: "🛒 Buyurtmalar", loading: "Yuklanmoqda…", back: "Orqaga",
-        tab_all: "Hammasi", tab_pending: "⏳ Yangi", tab_confirmed: "✅ Tasdiqlangan",
+        tab_today: "🟢 Bugun", tab_all: "Hammasi",
+        tab_confirmed: "✅ Tasdiqlangan",
         tab_delivered: "📦 Yetkazilgan", tab_cancelled: "❌ Bekor",
         ph_search: "🔎 ID yoki telefon bo'yicha qidirish…",
         empty: "Bu bo'limda buyurtmalar yo'q.", total_short: "{n} ta",
@@ -72,7 +73,8 @@
       },
       en: {
         page_title: "🛒 Orders", loading: "Loading…", back: "Back",
-        tab_all: "All", tab_pending: "⏳ New", tab_confirmed: "✅ Confirmed",
+        tab_today: "🟢 Today", tab_all: "All",
+        tab_confirmed: "✅ Confirmed",
         tab_delivered: "📦 Delivered", tab_cancelled: "❌ Cancelled",
         ph_search: "🔎 Search by ID or phone…",
         empty: "No orders in this category.", total_short: "{n}",
@@ -89,7 +91,8 @@
       },
       ru: {
         page_title: "🛒 Заказы", loading: "Загрузка…", back: "Назад",
-        tab_all: "Все", tab_pending: "⏳ Новые", tab_confirmed: "✅ Подтверждённые",
+        tab_today: "🟢 Сегодня", tab_all: "Все",
+        tab_confirmed: "✅ Подтверждённые",
         tab_delivered: "📦 Доставленные", tab_cancelled: "❌ Отменённые",
         ph_search: "🔎 Поиск по ID или телефону…",
         empty: "В этой категории заказов нет.", total_short: "{n}",

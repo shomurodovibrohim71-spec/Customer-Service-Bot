@@ -92,7 +92,9 @@
     const list = $("list");
     list.innerHTML = `<div class="loading">${T("loading")}</div>`;
     try {
-      const st = state.status === "all" ? "" : state.status;
+      // 'today' and 'all' both fetch the full list — we filter client-side
+      // by created_at for 'today'. Only real status values go to the API.
+      const st = (state.status === "all" || state.status === "today") ? "" : state.status;
       const qs = new URLSearchParams({
         tenant: tenantId, init_data: initData, uid: fallbackUid || "",
         status: st, limit: 300,
@@ -105,6 +107,11 @@
       $("cnt_delivered").textContent = c.delivered || 0;
       $("cnt_cancelled").textContent = c.cancelled || 0;
       state.all = data.orders || [];
+      // Today's count is computed on the client from the full list.
+      const t = todayStr();
+      const todayCount = state.all.filter(o => (o.created_at || "").startsWith(t)).length;
+      const cntToday = $("cnt_today");
+      if (cntToday) cntToday.textContent = todayCount;
       $("totalCount").textContent = tfmt("total_short", { n: state.all.length });
       renderList();
     } catch (e) {
@@ -116,6 +123,10 @@
     const list = $("list");
     list.innerHTML = "";
     let items = state.all;
+    if (state.status === "today") {
+      const t = todayStr();
+      items = items.filter(o => (o.created_at || "").startsWith(t));
+    }
     if (state.search) {
       items = items.filter(o =>
         String(o.id).includes(state.search) ||
@@ -133,27 +144,53 @@
   function card(o) {
     const c = document.createElement("article");
     c.className = "ord-card";
-    const itemsShort = (o.items || []).slice(0, 3)
-      .map(it => `${escapeHtml(it.name)} ${tfmt("x_qty", { q: it.qty })}`).join(", ");
-    const more = (o.items || []).length > 3 ? ` +${o.items.length - 3}` : "";
+    // Build the items preview from already-parsed items (escape once, inside the map).
+    const itemsList = (o.items || []).slice(0, 3);
+    const itemsHtml = itemsList.length
+      ? itemsList.map(it => `<span class="ord-item-chip"><span class="chip-name">${escapeHtml(it.name)}</span><span class="chip-qty">×${it.qty}</span></span>`).join("")
+      : `<span class="ord-item-chip"><span class="chip-name">${escapeHtml(o.service || "—")}</span></span>`;
+    const more = (o.items || []).length > 3
+      ? `<span class="ord-item-chip more">+${o.items.length - 3}</span>` : "";
+
     c.innerHTML = `
       <div class="ord-head">
-        <div>
-          <div class="ord-id">#${o.id} <span class="ord-date">${escapeHtml(fmtDate(o.created_at))}</span></div>
-          <div class="ord-user">${escapeHtml(o.full_name || ("id" + o.user_id))}${userTag(o)}</div>
+        <div class="ord-head-left">
+          <div class="ord-id">#${o.id}</div>
+          <div class="ord-date">📅 ${escapeHtml(fmtDate(o.created_at))}</div>
         </div>
         ${statusBadge(o.status)}
       </div>
-      <div class="ord-row">📞 <a href="tel:${escapeHtml(o.phone)}" class="fb-phone">${escapeHtml(o.phone || "—")}</a> ${payBadge(o.payment_method)}</div>
-      <div class="ord-row ord-addr">📍 ${escapeHtml(o.address || "—")}</div>
-      <div class="ord-items">🛒 ${escapeHtml(itemsShort || o.service || "—")}${more}</div>
+
+      <div class="ord-user-line">
+        <span class="ord-name">${escapeHtml(o.full_name || ("id" + o.user_id))}</span>
+        ${userTag(o)}
+      </div>
+
+      <div class="ord-contact">
+        ${o.phone ? `<a href="tel:${escapeHtml(o.phone)}" class="ord-phone">📞 ${escapeHtml(o.phone)}</a>` : ""}
+        ${payBadge(o.payment_method)}
+      </div>
+
+      <div class="ord-addr-row">📍 ${escapeHtml(o.address || "—")}</div>
+
+      <div class="ord-chips">${itemsHtml}${more}</div>
+
       <div class="ord-foot">
-        <strong class="ord-total">${fmt(o.amount)}</strong>
-        <button class="ghost-btn ord-open">${T("view_details")}</button>
+        <div class="ord-total-wrap">
+          <span class="ord-total-lbl">${T("lbl_total")}</span>
+          <strong class="ord-total">${fmt(o.amount)}</strong>
+        </div>
+        <button class="primary-btn ord-open">${T("view_details")}</button>
       </div>
     `;
     c.querySelector(".ord-open").onclick = () => openDetail(o.id);
     return c;
+  }
+
+  function todayStr() {
+    const d = new Date();
+    const p = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
   }
 
   // ----- Detail screen -------------------------------------------------
@@ -227,11 +264,27 @@
       <section class="dash-section">
         <h3>📍 ${T("lbl_address")} / ${T("lbl_branch")}</h3>
         <div class="ord-detail-block">
-          <div class="ord-row">${T("lbl_branch")}: ${escapeHtml(o.branch || "—")}</div>
-          <div class="ord-row">${T("lbl_address")}: ${escapeHtml(o.address || "—")}</div>
-          <div class="ord-row">${T("lbl_time")}: ${escapeHtml(o.preferred_time || "—")}</div>
+          <div class="ord-row">${T("lbl_branch")}: <strong>${escapeHtml(o.branch || "—")}</strong></div>
+          <div class="ord-row">${T("lbl_address")}: <strong>${escapeHtml(o.address || "—")}</strong></div>
+          ${o.entrance || o.floor || o.apartment || o.intercom ? `
+            <div class="ord-row ord-bldg">
+              🏠 ${o.entrance  ? `<span>Podyez: <strong>${escapeHtml(o.entrance)}</strong></span>`  : ""}
+                  ${o.floor     ? `<span>Qavat: <strong>${escapeHtml(o.floor)}</strong></span>`     : ""}
+                  ${o.apartment ? `<span>Xon.: <strong>${escapeHtml(o.apartment)}</strong></span>`  : ""}
+                  ${o.intercom  ? `<span>Domofon: <strong>${escapeHtml(o.intercom)}</strong></span>` : ""}
+            </div>` : ""}
+          <div class="ord-row">${T("lbl_time")}: <strong>${escapeHtml(o.preferred_time || "—")}</strong></div>
         </div>
       </section>
+
+      ${o.courier_note || o.note ? `
+        <section class="dash-section">
+          <h3>💬 Eslatmalar</h3>
+          <div class="ord-detail-block">
+            ${o.courier_note ? `<div class="ord-note"><span class="ord-note-tag">🚗 Kuryerga</span><div>${escapeHtml(o.courier_note)}</div></div>` : ""}
+            ${o.note         ? `<div class="ord-note"><span class="ord-note-tag">🍴 Restoranga</span><div>${escapeHtml(o.note)}</div></div>` : ""}
+          </div>
+        </section>` : ""}
 
       ${actions ? `<div class="ord-actions">${actions}</div>` : ""}
     `;

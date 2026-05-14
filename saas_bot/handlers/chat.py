@@ -64,10 +64,30 @@ async def ai_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     tenant = _tenant(context)
     user_text = message.text.strip()
 
-    # Skip any localized menu-button label - those are owned by other handlers.
+    # Skip any localized menu-button label — those are owned by other handlers.
+    # We check (a) exact match in any language and (b) a fallback set of
+    # known labels across all languages built once. The fallback covers cases
+    # where the menu text contains a Unicode variation-selector or stray
+    # whitespace that would defeat strict equality.
     if tenant.action_from_label(user_text):
         return
     if tenant.admin_action_from_label(user_text):
+        return
+    # Build a set of every known menu/admin label across every language. This
+    # is cheap and catches near-matches that strict equality misses.
+    all_labels: set[str] = set()
+    for labels in tenant.menu_labels.values():
+        all_labels.update(labels.values())
+    for labels in tenant.admin_labels.values():
+        all_labels.update(labels.values())
+    # Normalize for comparison: strip + collapse internal whitespace.
+    import re as _re
+    norm = _re.sub(r"\s+", " ", user_text).strip()
+    if any(_re.sub(r"\s+", " ", lbl).strip() == norm for lbl in all_labels):
+        return
+    # Also skip the home button regardless of language.
+    from utils.helpers import is_home_button_text
+    if is_home_button_text(user_text):
         return
 
     # Skip delivery/pickup reply-keyboard texts (consumed by the order conv).

@@ -183,6 +183,13 @@ _MIGRATIONS = [
     ("orders", "items_json",   "TEXT"),
     ("orders", "discount",     "INTEGER DEFAULT 0"),
     ("orders", "promo_code",   "TEXT"),
+    # Building details + notes (matches Mini Food checkout fields).
+    ("orders", "note",         "TEXT"),   # restaurant-facing note ("less mayo")
+    ("orders", "courier_note", "TEXT"),   # courier-facing note (delivery instructions)
+    ("orders", "entrance",     "TEXT"),   # podyez
+    ("orders", "intercom",     "TEXT"),   # domofon
+    ("orders", "apartment",    "TEXT"),   # xonadon
+    ("orders", "floor",        "TEXT"),   # qavat
     # Feedback dashboard: classification + AI reply + status + username cache.
     ("feedback", "username",    "TEXT"),
     ("feedback", "category",    "TEXT DEFAULT 'question'"),
@@ -374,6 +381,12 @@ class Database:
         items_json: str = "",
         discount: int = 0,
         promo_code: str = "",
+        note: str = "",
+        courier_note: str = "",
+        entrance: str = "",
+        intercom: str = "",
+        apartment: str = "",
+        floor: str = "",
     ) -> int:
         """Insert a new pending order and return its id."""
         cur = await self.conn.execute(
@@ -381,11 +394,17 @@ class Database:
             INSERT INTO orders
                 (tenant_id, user_id, full_name, phone, service, branch, address,
                  preferred_time, payment_method, payment_status, amount, status,
-                 items_json, discount, promo_code, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'unpaid', ?, 'pending', ?, ?, ?, ?)
+                 items_json, discount, promo_code,
+                 note, courier_note, entrance, intercom, apartment, floor,
+                 created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'unpaid', ?, 'pending', ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?,
+                    ?)
             """,
             (self.tenant_id, user_id, full_name, phone, service, branch, address,
-             preferred_time, payment_method, amount, items_json, discount, promo_code, _now()),
+             preferred_time, payment_method, amount, items_json, discount, promo_code,
+             note, courier_note, entrance, intercom, apartment, floor,
+             _now()),
         )
         await self.conn.commit()
         return int(cur.lastrowid)

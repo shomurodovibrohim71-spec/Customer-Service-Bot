@@ -285,7 +285,10 @@
       document.querySelectorAll('.seg-btn[data-method]').forEach(x => x.classList.remove("active"));
       b.classList.add("active");
       state.deliveryType = b.dataset.method;
-      $("branchLabel").classList.toggle("hidden", state.deliveryType !== "pickup");
+      const isPickup = state.deliveryType === "pickup";
+      $("branchLabel").classList.toggle("hidden", !isPickup);
+      // Hide the address card when picking up — only branch matters then.
+      $("addrCard")?.classList.toggle("hidden", isPickup);
     };
   });
   // Payment method toggle (group B: data-pay)
@@ -344,6 +347,12 @@
       preferred_time: finalTime,
       payment_method: state.paymentMethod,
       promo_code: state.promo?.code || "",
+      note:         $("inputNote")?.value.trim() || "",
+      courier_note: $("inputCourierNote")?.value.trim() || "",
+      entrance:     $("inputEntrance")?.value.trim() || "",
+      floor:        $("inputFloor")?.value.trim() || "",
+      apartment:    $("inputApartment")?.value.trim() || "",
+      intercom:     $("inputIntercom")?.value.trim() || "",
       items: Object.entries(state.cart).map(([pid, qty]) => ({ product_id: parseInt(pid), qty }))
     };
 
@@ -606,6 +615,16 @@
     return `<span class="hist-badge ${cls}">${T("status_" + status, status)}</span>`;
   }
 
+  function canSelfCancel(o) {
+    if (o.status !== "pending") return 0;  // returns remaining seconds, or 0
+    try {
+      const created = new Date((o.created_at || "").replace("Z", "") + "Z");
+      const elapsed = (Date.now() - created.getTime()) / 1000;
+      const remaining = 120 - elapsed;
+      return remaining > 0 ? Math.floor(remaining) : 0;
+    } catch { return 0; }
+  }
+
   function historyCard(o) {
     const card = document.createElement("article");
     card.className = "hist-card";
@@ -616,6 +635,7 @@
     const moreHtml = (o.items || []).length > 4
       ? `<div class="hist-item muted">${tfmt("hist_more", { n: o.items.length - 4 })}</div>` : "";
     const reorderable = (o.items || []).some(it => findProduct(it.product_id));
+    const cancelSec = canSelfCancel(o);
     card.innerHTML = `
       <div class="hist-head">
         <div>
@@ -629,7 +649,44 @@
         <strong class="hist-total">${fmt(o.amount)}</strong>
         ${reorderable ? `<button class="primary-btn reorder-btn">${T("reorder")}</button>` : ''}
       </div>
+      ${cancelSec ? `
+        <button class="ghost-btn cancel-btn" style="border-color:var(--danger);color:var(--danger);margin-top:6px">
+          ${T("cancel_btn")} <span class="cancel-cd">${cancelSec}s</span>
+        </button>` : ""}
     `;
+    const cbtn = card.querySelector(".cancel-btn");
+    if (cbtn) {
+      // Live countdown so the button disappears at 0.
+      let left = cancelSec;
+      const cdEl = card.querySelector(".cancel-cd");
+      const timer = setInterval(() => {
+        left -= 1;
+        if (cdEl) cdEl.textContent = left + "s";
+        if (left <= 0) { clearInterval(timer); cbtn.remove(); }
+      }, 1000);
+      cbtn.onclick = async () => {
+        if (!confirm(T("confirm_cancel_my"))) return;
+        cbtn.disabled = true;
+        try {
+          const r = await fetch("/api/orders/cancel", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              init_data: initData, fallback_uid: fallbackUid,
+              tenant_id: tenantId, order_id: o.id,
+            }),
+          });
+          const data = await r.json();
+          if (!r.ok) throw new Error(data.detail || "");
+          if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
+          clearInterval(timer);
+          await loadHistory();
+        } catch (e) {
+          alert(T("cancel_failed") + (e.message ? ": " + e.message : ""));
+          cbtn.disabled = false;
+        }
+      };
+    }
     const btn = card.querySelector(".reorder-btn");
     if (btn) {
       btn.onclick = () => {

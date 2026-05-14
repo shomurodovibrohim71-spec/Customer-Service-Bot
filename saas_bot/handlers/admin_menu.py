@@ -51,18 +51,27 @@ def _is_admin(update: Update, tenant: Tenant) -> bool:
     return bool(update.effective_user and update.effective_user.id in tenant.admin_ids)
 
 
-async def _admin_guard(update: Update, tenant: Tenant) -> bool:
-    if _is_admin(update, tenant):
-        return True
-    if update.message:
-        await update.message.reply_text("🚫 Faqat admin uchun.")
-    return False
+async def _admin_guard(
+    update: Update, tenant: Tenant,
+    context: ContextTypes.DEFAULT_TYPE | None = None,
+) -> bool:
+    """Allow only real admins, AND only when user_view is off.
+
+    Silent on rejection. Several admin handlers fire on text labels that also
+    appear in the user keyboard (e.g. '🏠 Filiallar'), so a vocal '🚫 Faqat
+    admin' would double-message the customer. The user-side handler in a
+    lower group will pick up the same update."""
+    if not _is_admin(update, tenant):
+        return False
+    if context is not None and context.user_data.get("user_view"):
+        return False
+    return True
 
 
 # ==================================================================== ADD PRODUCT
 
 async def addproduct_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    if not await _admin_guard(update, _tenant(context)):
+    if not await _admin_guard(update, _tenant(context), context):
         return ConversationHandler.END
     await update.message.reply_text(
         "➕ *Yangi mahsulot qo'shish*\n\n1️⃣ Mahsulot nomini kiriting (emoji bilan):",
@@ -291,7 +300,7 @@ def _products_list_keyboard(products: list[dict]) -> InlineKeyboardMarkup:
 async def editproduct_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """'📦 Mahsulotlar' button: open the admin WebApp page when WEBAPP_URL is set,
     otherwise fall back to the legacy inline list."""
-    if not await _admin_guard(update, _tenant(context)):
+    if not await _admin_guard(update, _tenant(context), context):
         return
     tenant = _tenant(context)
     db = _db(context)
@@ -406,7 +415,7 @@ async def editproduct_value_capture(update: Update, context: ContextTypes.DEFAUL
 
 
 async def delproduct_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if not await _admin_guard(update, _tenant(context)):
+    if not await _admin_guard(update, _tenant(context), context):
         return
     db = _db(context)
     products = await db.list_products()
@@ -448,7 +457,7 @@ async def delproduct_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
 # ==================================================================== LIST PRODUCTS
 
 async def listproducts_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if not await _admin_guard(update, _tenant(context)):
+    if not await _admin_guard(update, _tenant(context), context):
         return
     db = _db(context)
     products = await db.list_products()
@@ -465,7 +474,7 @@ async def listproducts_command(update: Update, context: ContextTypes.DEFAULT_TYP
 # ==================================================================== ADD BRANCH
 
 async def addbranch_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    if not await _admin_guard(update, _tenant(context)):
+    if not await _admin_guard(update, _tenant(context), context):
         return ConversationHandler.END
     await update.message.reply_text(
         "🏪 *Yangi filial qo'shish*\n\n1️⃣ Filial nomini kiriting:",
@@ -522,7 +531,7 @@ async def addbranch_phone(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 # ==================================================================== DEL BRANCH
 
 async def delbranch_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if not await _admin_guard(update, _tenant(context)):
+    if not await _admin_guard(update, _tenant(context), context):
         return
     db = _db(context)
     branches = await db.list_branches()
@@ -602,7 +611,7 @@ def _edit_branch_keyboard(branch_id: int) -> InlineKeyboardMarkup:
 
 async def editbranch_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Replacement for the old text-dump + delete-list combo: a clean inline list."""
-    if not await _admin_guard(update, _tenant(context)):
+    if not await _admin_guard(update, _tenant(context), context):
         return
     db = _db(context)
     branches = await db.list_branches()
@@ -716,7 +725,7 @@ async def editbranch_value_capture(update: Update, context: ContextTypes.DEFAULT
 # ==================================================================== LIST BRANCHES
 
 async def listbranches_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if not await _admin_guard(update, _tenant(context)):
+    if not await _admin_guard(update, _tenant(context), context):
         return
     db = _db(context)
     branches = await db.list_branches()
@@ -732,7 +741,7 @@ async def listbranches_command(update: Update, context: ContextTypes.DEFAULT_TYP
 # ==================================================================== ADMIN HELP
 
 async def adminhelp_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if not await _admin_guard(update, _tenant(context)):
+    if not await _admin_guard(update, _tenant(context), context):
         return
     text = (
         "🛠 *Admin buyruqlar:*\n\n"

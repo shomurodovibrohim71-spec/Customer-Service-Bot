@@ -100,6 +100,8 @@ async def menu_router(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     elif action == "settings":
         from handlers.features import settings_handler
         await settings_handler(update, context)
+    elif action == "about":
+        await _show_about(update, context, tenant, db, lang)
     elif action == "back":
         await update.message.reply_text(
             tenant.t(lang, "main_menu"),
@@ -132,6 +134,52 @@ async def _show_loyalty(update, context, tenant: Tenant, db: Database, lang: str
     await update.message.reply_text(
         text,
         parse_mode=ParseMode.MARKDOWN,
+        reply_markup=main_reply_keyboard(tenant, lang),
+    )
+
+
+async def _show_about(update, context, tenant: Tenant, db: Database, lang: str) -> None:
+    """User-side 'Kompaniya haqida' — render fields the admin saved via the
+    Biz haqimizda WebApp, falling back to tenant config defaults."""
+    async def _get(key: str) -> str:
+        v = await db.get_setting(f"company.{key}", "")
+        return v or str(tenant.get(key, "") or "")
+
+    name      = await _get("name")     or tenant.name
+    tagline   = await _get("tagline")
+    about     = await _get("about")
+    phone     = await _get("phone")
+    address   = await _get("address")
+    hours     = await _get("working_hours")
+
+    headers = {
+        "uz": ("🏢", "📝 Tavsif:", "📞 Telefon:", "📍 Manzil:", "🕐 Ish vaqti:",
+               "Ma'lumot hozircha qo'shilmagan."),
+        "en": ("🏢", "📝 Description:", "📞 Phone:", "📍 Address:", "🕐 Hours:",
+               "No info added yet."),
+        "ru": ("🏢", "📝 Описание:", "📞 Телефон:", "📍 Адрес:", "🕐 Режим работы:",
+               "Информация ещё не добавлена."),
+    }.get(lang, None) or ({}, "", "", "", "", "")
+    h_emoji, lbl_desc, lbl_phone, lbl_addr, lbl_hours, fallback = headers
+
+    lines = [f"{h_emoji} *{name}*"]
+    if tagline:
+        lines.append(f"_{tagline}_")
+    if about:
+        lines.append("")
+        lines.append(f"{lbl_desc}\n{about}")
+    if phone:
+        lines.append("")
+        lines.append(f"{lbl_phone} {phone}")
+    if address:
+        lines.append(f"{lbl_addr} {address}")
+    if hours:
+        lines.append(f"{lbl_hours} {hours}")
+    if len(lines) == 1 and not (tagline or about or phone or address or hours):
+        lines.append("")
+        lines.append(f"_{fallback}_")
+    await update.message.reply_text(
+        "\n".join(lines), parse_mode=ParseMode.MARKDOWN,
         reply_markup=main_reply_keyboard(tenant, lang),
     )
 

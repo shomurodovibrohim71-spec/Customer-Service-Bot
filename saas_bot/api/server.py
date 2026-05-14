@@ -59,6 +59,22 @@ if WEBAPP_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(WEBAPP_DIR)), name="static")
 
 
+# WebApp HTMLs must never be cached — Telegram WebView keeps stale copies for
+# hours otherwise, so language switches and JS updates don't reach the user.
+_NO_CACHE = {
+    "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
+    "Pragma": "no-cache",
+    "Expires": "0",
+}
+
+
+def _webapp_file(name: str) -> FileResponse:
+    path = WEBAPP_DIR / name
+    if not path.exists():
+        raise HTTPException(status_code=404, detail=f"{name} not found")
+    return FileResponse(str(path), headers=_NO_CACHE)
+
+
 # =========================================================== Admin auth API
 
 def require_auth(authorization: Annotated[str | None, Header()] = None) -> None:
@@ -396,6 +412,13 @@ class OrderIn(BaseModel):
     items: list[OrderItem]
     payment_method: str = "cash"  # 'cash' | 'card'
     promo_code: str = ""
+    # Building details + notes (Mini Food-style checkout)
+    note: str = ""           # restaurant note (e.g. "less mayo")
+    courier_note: str = ""   # courier note (e.g. "leave at door")
+    entrance: str = ""       # podyez
+    intercom: str = ""       # domofon
+    apartment: str = ""      # xonadon
+    floor: str = ""          # qavat
 
 
 # ============================================================ Order history
@@ -446,6 +469,56 @@ async def api_orders_history(
             "items": items,
         })
     return {"orders": orders}
+
+
+# ============================================================ Self-cancel
+
+class UserCancelOrderIn(BaseModel):
+    init_data: str = ""
+    fallback_uid: int | None = None
+    tenant_id: str
+    order_id: int
+
+
+# Window during which the customer can self-cancel their order.
+_USER_CANCEL_WINDOW_SECONDS = 120
+
+
+@app.post("/api/orders/cancel")
+async def api_user_cancel_order(payload: UserCancelOrderIn) -> dict[str, Any]:
+    """Customer cancels their own order — only allowed within the first 2 minutes
+    after placing it AND only while still in 'pending' status."""
+    from datetime import datetime as _dt
+    t = get_tenant(payload.tenant_id)
+    user_id = _resolve_user(t, payload.init_data, payload.fallback_uid)
+    db = get_db(payload.tenant_id)
+    order = await db.get_order(payload.order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="order not found")
+    if int(order["user_id"]) != user_id:
+        raise HTTPException(status_code=403, detail="not your order")
+    if order.get("status") != "pending":
+        raise HTTPException(status_code=400, detail="too_late_status")
+    try:
+        created = _dt.fromisoformat((order.get("created_at") or "").replace("Z", ""))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=500, detail="bad timestamp")
+    elapsed = (_dt.utcnow() - created).total_seconds()
+    if elapsed > _USER_CANCEL_WINDOW_SECONDS:
+        raise HTTPException(status_code=400, detail="too_late_window")
+    await db.set_order_status(payload.order_id, "cancelled")
+    # Notify admins.
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            for admin_id in t.admin_ids:
+                await client.post(
+                    f"https://api.telegram.org/bot{t.bot_token}/sendMessage",
+                    json={"chat_id": admin_id,
+                          "text": f"❌ Buyurtma #{payload.order_id} mijoz tomonidan bekor qilindi (2 daq. ichida)."},
+                )
+    except httpx.HTTPError as exc:
+        logger.warning("[%s] cancel notify failed: %s", t.id, exc)
+    return {"ok": True, "elapsed": int(elapsed)}
 
 
 # ============================================================== Promo codes
@@ -762,6 +835,12 @@ async def api_admin_orders_list(
             "phone": r.get("phone") or (u or {}).get("phone") or "",
             "branch": r.get("branch") or "",
             "address": r.get("address") or "",
+            "entrance": r.get("entrance") or "",
+            "intercom": r.get("intercom") or "",
+            "apartment": r.get("apartment") or "",
+            "floor": r.get("floor") or "",
+            "courier_note": r.get("courier_note") or "",
+            "note": r.get("note") or "",
             "preferred_time": r.get("preferred_time") or "",
             "payment_method": r.get("payment_method") or "cash",
             "amount": int(r.get("amount") or 0),
@@ -1003,6 +1082,9 @@ async def api_order(payload: OrderIn) -> dict[str, Any]:
         payment_method=payment_method, amount=total,
         items_json=json.dumps(items_for_json, ensure_ascii=False),
         discount=discount, promo_code=applied_code,
+        note=payload.note, courier_note=payload.courier_note,
+        entrance=payload.entrance, intercom=payload.intercom,
+        apartment=payload.apartment, floor=payload.floor,
     )
     if applied_code:
         await db.increment_promo_use(applied_code)
@@ -1018,16 +1100,30 @@ async def api_order(payload: OrderIn) -> dict[str, Any]:
 
     pay_method_label = "💳 Karta" if payment_method == "card" else "💵 Naqd"
     discount_line = f"\n🎟 Promokod: {applied_code} (-{discount:,} so'm)" if applied_code else ""
+
+    # Building details inline (only show fields that were filled).
+    bldg_parts: list[str] = []
+    if payload.entrance:  bldg_parts.append(f"Podyez: {payload.entrance}")
+    if payload.intercom:  bldg_parts.append(f"Domofon: {payload.intercom}")
+    if payload.apartment: bldg_parts.append(f"Xonadon: {payload.apartment}")
+    if payload.floor:     bldg_parts.append(f"Qavat: {payload.floor}")
+    bldg_line = f"\n🏠 {' · '.join(bldg_parts)}" if bldg_parts else ""
+    courier_line = f"\n📝 Kuryerga: {payload.courier_note}" if payload.courier_note else ""
+    note_line    = f"\n💬 Restoranga: {payload.note}" if payload.note else ""
+
     admin_text = (
         f"🆕 *Yangi buyurtma* #{order_id} (WebApp)\n\n"
         f"👤 {full_name} (@{user.get('username') or '-'})\n"
         f"📞 {phone}\n"
         f"🚚 Usul: {payload.delivery_type}\n"
         f"🏪 Filial: {branch_name or '-'}\n"
-        f"📍 {payload.address}\n"
-        f"🕐 {payload.preferred_time}\n"
+        f"📍 {payload.address}"
+        f"{bldg_line}"
+        f"\n🕐 {payload.preferred_time}\n"
         f"💳 To'lov: {pay_method_label}"
-        f"{discount_line}\n\n"
+        f"{discount_line}"
+        f"{courier_line}"
+        f"{note_line}\n\n"
         f"🛒 *Mahsulotlar:*\n" + "\n".join(lines) + f"\n\n💰 *Jami:* {total:,} so'm"
     )
     async with httpx.AsyncClient(timeout=10.0) as client:

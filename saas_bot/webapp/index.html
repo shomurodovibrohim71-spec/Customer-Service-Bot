@@ -51,41 +51,71 @@
       <button class="back-btn" id="checkoutBack" type="button" data-t="back">Orqaga</button>
       <h2 data-t="checkout_title">📋 Rasmiylashtirish</h2>
     </header>
-    <div class="form">
-      <label><span data-t="lbl_address">📍 Manzil</span>
-        <input id="inputAddress" type="text" data-t-placeholder="ph_address" placeholder="Yetkazib berish manzili">
-      </label>
-      <label><span data-t="lbl_method">🚚 Usul</span>
-        <div class="seg">
-          <button data-method="delivery" class="seg-btn active" type="button" data-t="m_delivery">🚚 Yetkazib berish</button>
-          <button data-method="pickup" class="seg-btn" type="button" data-t="m_pickup">🚶 Olib ketish</button>
+    <div class="form checkout-form">
+
+      <!-- Method selector -->
+      <div class="seg seg-method">
+        <button data-method="delivery" class="seg-btn active" type="button" data-t="m_delivery">🚚 Yetkazib berish</button>
+        <button data-method="pickup" class="seg-btn" type="button" data-t="m_pickup">🚶 Olib ketish</button>
+      </div>
+
+      <!-- Address card (delivery only) -->
+      <section id="addrCard" class="co-card">
+        <h3 class="co-title" data-t="co_where">📍 Qayerga</h3>
+        <label class="co-row">
+          <span class="co-row-icon">📍</span>
+          <input id="inputAddress" type="text" data-t-placeholder="ph_address" placeholder="Yetkazib berish manzili">
+        </label>
+        <!-- Building details: 2x2 grid -->
+        <div class="bldg-grid">
+          <input id="inputEntrance"  type="text" data-t-placeholder="ph_entrance"  placeholder="Podyez">
+          <input id="inputFloor"     type="text" data-t-placeholder="ph_floor"     placeholder="Qavat">
+          <input id="inputApartment" type="text" data-t-placeholder="ph_apartment" placeholder="Xonadon">
+          <input id="inputIntercom"  type="text" data-t-placeholder="ph_intercom"  placeholder="Domofon">
         </div>
-      </label>
-      <div id="branchLabel" class="hidden">
-        <div class="label" data-t="pick_branch">🏪 Filialni tanlang</div>
+        <label class="co-row co-row-icon-row">
+          <span class="co-row-icon">💬</span>
+          <input id="inputCourierNote" type="text" data-t-placeholder="ph_courier_note" placeholder="Kuryerga eslatma">
+        </label>
+        <label class="co-row co-row-icon-row">
+          <span class="co-row-icon">🍴</span>
+          <input id="inputNote" type="text" data-t-placeholder="ph_note" placeholder="Restoranga eslatma (kam mayonez, achchiq emas...)">
+        </label>
+      </section>
+
+      <!-- Pickup branch picker -->
+      <div id="branchLabel" class="co-card hidden">
+        <h3 class="co-title" data-t="pick_branch">🏪 Filialni tanlang</h3>
         <div id="branchPicker" class="branch-picker"></div>
       </div>
-      <label><span data-t="lbl_payment">💳 To'lov turi</span>
+
+      <!-- Payment + time + promo -->
+      <section class="co-card">
+        <h3 class="co-title" data-t="lbl_payment">💳 To'lov</h3>
         <div class="seg">
           <button data-pay="cash" class="seg-btn active" type="button" data-t="p_cash">💵 Naqd</button>
           <button data-pay="card" class="seg-btn" type="button" data-t="p_card">💳 Karta</button>
         </div>
-      </label>
-      <label><span data-t="lbl_time">🕐 Vaqt (ixtiyoriy)</span>
-        <input id="inputTime" type="text" data-t-placeholder="ph_time" placeholder='Bo''sh = "hozir"'>
-      </label>
-      <label><span data-t="lbl_promo">🎟 Promokod (ixtiyoriy)</span>
-        <div class="promo-row">
-          <input id="inputPromo" type="text" data-t-placeholder="ph_promo" placeholder="WELCOME10" autocapitalize="characters">
-          <button id="promoBtn" class="ghost-btn" type="button" data-t="apply">Qo'llash</button>
-        </div>
-      </label>
-      <div id="promoMsg" class="promo-msg hidden"></div>
-      <div class="summary">
+        <label class="co-row co-row-icon-row">
+          <span class="co-row-icon">🕐</span>
+          <input id="inputTime" type="text" data-t-placeholder="ph_time" placeholder='Vaqt (bo''sh = "hozir")'>
+        </label>
+        <label class="co-row co-row-icon-row">
+          <span class="co-row-icon">🎟</span>
+          <input id="inputPromo" type="text" data-t-placeholder="ph_promo" placeholder="Promokod" autocapitalize="characters">
+          <button id="promoBtn" class="ghost-btn co-row-btn" type="button" data-t="apply">Qo'llash</button>
+        </label>
+        <div id="promoMsg" class="promo-msg hidden"></div>
+      </section>
+
+      <!-- Price details -->
+      <section class="co-card">
+        <h3 class="co-title" data-t="lbl_price_details">🧾 Hisob</h3>
         <div class="row"><span data-t="lbl_subtotal">Mahsulotlar:</span><span id="checkoutSubtotal">0</span></div>
         <div id="checkoutDiscountRow" class="row hidden" style="color:var(--success)"><span data-t="lbl_discount">Chegirma:</span><span id="checkoutDiscount">0</span></div>
         <div class="row total"><span data-t="lbl_total">Jami:</span><strong id="checkoutTotal">0</strong></div>
-      </div>
+      </section>
+
       <button id="submitBtn" class="primary-btn" data-t="confirm">✅ Tasdiqlash</button>
       <div id="errBox" class="err hidden"></div>
     </div>
@@ -159,6 +189,10 @@
   <script>
     window.STRINGS = {
       uz: {
+        co_where: "📍 Qayerga", lbl_price_details: "🧾 Hisob",
+        ph_entrance: "Podyez", ph_floor: "Qavat", ph_apartment: "Xonadon", ph_intercom: "Domofon",
+        ph_courier_note: "Kuryerga eslatma",
+        ph_note: "Restoranga eslatma (kam mayonez, achchiq emas...)",
         no_address: "Manzil tanlanmagan", loading: "Yuklanmoqda…", back: "Orqaga",
         cart_label: "Savatcha", cart_title: "🛒 Savatcha", place_order: "Buyurtma berish",
         checkout_title: "📋 Rasmiylashtirish",
@@ -195,11 +229,18 @@
         hist_empty: "Sizda hozircha buyurtmalar yo'q.",
         hist_label: "Buyurtma", hist_more: "… va yana {n} ta",
         reorder: "🔄 Qaytadan buyurtma",
+        cancel_btn: "❌ Bekor qilish",
+        confirm_cancel_my: "Buyurtmani bekor qilasizmi?",
+        cancel_failed: "Bekor qilib bo'lmadi",
         status_pending: "⏳ Kutilmoqda", status_confirmed: "✅ Tasdiqlangan",
         status_delivered: "📦 Yetkazilgan", status_cancelled: "❌ Bekor qilingan",
         soum: "so'm", add_to_cart: "➕ Qo'shish", more_items: "+{n}",
       },
       en: {
+        co_where: "📍 Where to", lbl_price_details: "🧾 Price details",
+        ph_entrance: "Entrance", ph_floor: "Floor", ph_apartment: "Apartment", ph_intercom: "Door code",
+        ph_courier_note: "Note for courier",
+        ph_note: "Note for restaurant (less mayo, not spicy...)",
         no_address: "No address selected", loading: "Loading…", back: "Back",
         cart_label: "Cart", cart_title: "🛒 Cart", place_order: "Place order",
         checkout_title: "📋 Checkout",
@@ -236,11 +277,18 @@
         hist_empty: "You have no orders yet.",
         hist_label: "Order", hist_more: "… and {n} more",
         reorder: "🔄 Reorder",
+        cancel_btn: "❌ Cancel",
+        confirm_cancel_my: "Cancel this order?",
+        cancel_failed: "Could not cancel",
         status_pending: "⏳ Pending", status_confirmed: "✅ Confirmed",
         status_delivered: "📦 Delivered", status_cancelled: "❌ Cancelled",
         soum: "so'm", add_to_cart: "➕ Add", more_items: "+{n}",
       },
       ru: {
+        co_where: "📍 Куда", lbl_price_details: "🧾 Детали цены",
+        ph_entrance: "Подъезд", ph_floor: "Этаж", ph_apartment: "Квартира", ph_intercom: "Домофон",
+        ph_courier_note: "Заметка курьеру",
+        ph_note: "Заметка ресторану (меньше майонеза, не острое...)",
         no_address: "Адрес не выбран", loading: "Загрузка…", back: "Назад",
         cart_label: "Корзина", cart_title: "🛒 Корзина", place_order: "Оформить заказ",
         checkout_title: "📋 Оформление",
@@ -277,6 +325,9 @@
         hist_empty: "У вас пока нет заказов.",
         hist_label: "Заказ", hist_more: "… и ещё {n}",
         reorder: "🔄 Повторить заказ",
+        cancel_btn: "❌ Отменить",
+        confirm_cancel_my: "Отменить заказ?",
+        cancel_failed: "Не удалось отменить",
         status_pending: "⏳ В ожидании", status_confirmed: "✅ Подтверждён",
         status_delivered: "📦 Доставлен", status_cancelled: "❌ Отменён",
         soum: "сум", add_to_cart: "➕ Добавить", more_items: "+{n}",

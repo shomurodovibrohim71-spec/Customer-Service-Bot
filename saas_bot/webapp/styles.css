@@ -268,6 +268,55 @@ body { padding-bottom: env(safe-area-inset-bottom); }
 .row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 15px; }
 .row.total { font-size: 18px; font-weight: 800; padding-top: 10px; border-top: 1px dashed var(--line); margin-top: 4px; }
 
+/* ---------- Checkout cards (Yandex-inspired layout) -------------------- */
+.checkout-form { gap: 16px; }
+.co-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 14px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.co-title {
+  margin: 0; font-size: 16px; font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.co-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.co-row:last-child { border-bottom: none; }
+.co-row-icon-row .co-row-icon { color: var(--text-muted); font-size: 17px; flex: 0 0 22px; }
+.co-row input {
+  flex: 1; border: none; background: transparent;
+  color: var(--text); font-size: 15px;
+  padding: 4px 0;
+}
+.co-row input:focus { outline: none; }
+.co-row .co-row-btn {
+  margin: 0; padding: 8px 14px;
+  width: auto; flex: 0 0 auto; font-size: 13px;
+}
+
+.bldg-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.bldg-grid input {
+  padding: 12px 10px;
+  border: none;
+  border-right: 1px solid var(--line);
+  background: transparent;
+  color: var(--text); font-size: 14px;
+}
+.bldg-grid input:nth-child(2n) { border-right: none; }
+.bldg-grid input:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
+.bldg-grid input:focus { outline: none; background: rgba(255,122,24,0.05); }
+
+.seg-method { margin-bottom: 4px; }
+
 /* ---------- Forms ------------------------------------------------------ */
 .form { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
 .form label {
@@ -950,6 +999,14 @@ textarea { width: 100%; resize: vertical; min-height: 80px; }
   margin-top: 16px;
 }
 .ord-actions .primary-btn, .ord-actions .ghost-btn { width: 100%; margin: 0; }
+
+.ord-bldg { display: flex; flex-wrap: wrap; gap: 12px 16px; font-size: 13px; padding: 8px 10px; background: var(--bg-soft); border-radius: var(--r-sm); margin-top: 4px; }
+.ord-bldg span { color: var(--text-muted); }
+.ord-bldg strong { color: var(--text); }
+
+.ord-note { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; background: var(--bg-soft); border-radius: var(--r-sm); }
+.ord-note-tag { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.ord-note + .ord-note { margin-top: 6px; }
 
 /* =========================================================================
    Admin promo manager

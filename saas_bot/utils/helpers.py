@@ -146,7 +146,8 @@ def main_reply_keyboard(tenant, lang: str) -> ReplyKeyboardMarkup:
         [KeyboardButton(L("order")), KeyboardButton(L("geo"), request_location=True)],
         [KeyboardButton(L("loyalty_qr")), KeyboardButton(L("points"))],
         [KeyboardButton(L("branches")), KeyboardButton(L("addresses"))],
-        [KeyboardButton(L("feedback")), KeyboardButton(L("settings"))],
+        [KeyboardButton(L("feedback")), KeyboardButton(L("about"))],
+        [KeyboardButton(L("settings"))],
     ]
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)
 
