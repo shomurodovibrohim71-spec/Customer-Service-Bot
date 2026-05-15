@@ -942,19 +942,19 @@ class Database:
     # -------------------------------------------------------------- analytics
 
     async def revenue_summary(self) -> dict[str, int]:
-        """Aggregate revenue for confirmed/pending orders: total, today, week."""
+        """Aggregate revenue for confirmed/pending orders: month, today, week."""
         today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
         week  = today - timedelta(days=7)
+        month = today.replace(day=1)
         out: dict[str, int] = {}
-        # Count cancelled separately — they don't add to revenue.
         async with self.conn.execute(
             """SELECT COALESCE(SUM(amount), 0) AS s, COUNT(*) AS n
-               FROM orders WHERE tenant_id=? AND status != 'cancelled'""",
-            (self.tenant_id,),
+               FROM orders WHERE tenant_id=? AND status != 'cancelled' AND created_at>=?""",
+            (self.tenant_id, month.isoformat(timespec="seconds")),
         ) as cur:
             r = await cur.fetchone()
-            out["total_revenue"] = int(r["s"] or 0)
-            out["total_orders"]  = int(r["n"] or 0)
+            out["month_revenue"] = int(r["s"] or 0)
+            out["month_orders"]  = int(r["n"] or 0)
         async with self.conn.execute(
             """SELECT COALESCE(SUM(amount), 0) AS s, COUNT(*) AS n
                FROM orders WHERE tenant_id=? AND status != 'cancelled' AND created_at>=?""",

@@ -51,8 +51,8 @@
     $("statsSub").textContent = d.tenant_name || tenantId;
 
     const oc = (n) => tfmt("orders_count", { n: fmtN(n) });
-    $("mRevTotal").textContent  = fmt(d.total_revenue);
-    $("mOrdTotal").textContent  = oc(d.total_orders);
+    $("mRevTotal").textContent  = fmt(d.month_revenue);
+    $("mOrdTotal").textContent  = oc(d.month_orders);
     $("mRevToday").textContent  = fmt(d.today_revenue);
     $("mOrdToday").textContent  = oc(d.today_orders);
     $("mRevWeek").textContent   = fmt(d.week_revenue);
