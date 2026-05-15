@@ -111,6 +111,17 @@
         <div id="promoMsg" class="promo-msg hidden"></div>
       </section>
 
+      <!-- Card payment info (shown when Karta selected) -->
+      <section id="checkoutCardInfo" class="co-card hidden" style="border-color:rgba(255,149,0,.35)">
+        <h3 class="co-title">💳 Karta orqali to'lov</h3>
+        <div style="font-size:13px;color:var(--text-muted);margin-bottom:10px" data-t="card_pay_hint">Buyurtma tasdiqlangach quyidagi kartaga pul o'tkazing:</div>
+        <div style="background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+          <span id="checkoutCardNum" style="font-size:17px;font-weight:700;letter-spacing:.06em;font-family:monospace">—</span>
+          <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('checkoutCardNum').textContent).catch(()=>{})" style="background:var(--brand);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:13px;font-weight:700;cursor:pointer">Nusxa</button>
+        </div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:8px" data-t="card_pay_note">To'lov tasdig'i sifatida chek rasmini adminlarga yuboring</div>
+      </section>
+
       <!-- Price details -->
       <section class="co-card">
         <h3 class="co-title" data-t="lbl_price_details">🧾 Hisob</h3>
@@ -267,6 +278,8 @@
         save_btn: "✅ Saqlash", detecting: "📍 Manzilni aniqlayapman…",
         map_title: "🗺 Manzilni xaritada tanlang",
         drag_pin: "📍 Pin qo'yish uchun xaritani siljiting", save_this_addr: "✅ Shu manzilni saqlash",
+        card_pay_hint: "Buyurtma tasdiqlangach quyidagi kartaga pul o'tkazing:",
+        card_pay_note: "To'lov tasdig'i sifatida chek rasmini adminlarga yuboring",
         err_addr: "📍 Manzilni kiriting", err_cart_empty: "🛒 Savatcha bo'sh",
         err_no_init: "⚠️ Botdan 'Buyurtma berish' tugmasi orqali oching",
         err_server: "Server xato: ", err_geo_unsupported: "⚠️ Brauzeringiz joylashuvni qo'llab-quvvatlamaydi",

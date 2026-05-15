@@ -501,6 +501,8 @@ async def api_menu(tenant_id: str = Query(..., alias="tenant")) -> dict[str, Any
             "description": p.get("description") or "",
             "image_url": p.get("image_url") or "",
         })
+    settings = await db.all_settings()
+    card_number = settings.get("company.card_number", "").strip()
     return {
         "tenant_id": tenant_id,
         "tenant_name": tenant.name,
@@ -509,8 +511,9 @@ async def api_menu(tenant_id: str = Query(..., alias="tenant")) -> dict[str, Any
         "branches": [
             {"id": b["id"], "name": b["name"], "address": b.get("address", ""),
              "lat": b.get("lat"), "lon": b.get("lon")}
-            for b in branches
+            for b in branches if b.get("is_open", 1) != 0
         ],
+        "card_number": card_number,
     }
 
 

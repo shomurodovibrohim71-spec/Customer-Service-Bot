@@ -372,6 +372,8 @@
       document.querySelectorAll('.seg-btn[data-pay]').forEach(x => x.classList.remove("active"));
       b.classList.add("active");
       state.paymentMethod = b.dataset.pay;
+      const cardInfo = $("checkoutCardInfo");
+      if (cardInfo) cardInfo.classList.toggle("hidden", b.dataset.pay !== "card");
     };
   });
 
@@ -380,7 +382,13 @@
     const picker = $("branchPicker");
     if (!picker) return;
     picker.innerHTML = "";
-    state.menu.branches.forEach((b, idx) => {
+    const openBranches = state.menu.branches.filter(b => b.is_open !== 0);
+    // Also pre-fill card number if available
+    const cardNumEl = $("checkoutCardNum");
+    if (cardNumEl && state.menu.card_number) {
+      cardNumEl.textContent = state.menu.card_number;
+    }
+    openBranches.forEach((b, idx) => {
       const card = document.createElement("div");
       card.className = "branch-pick-card" + (idx === 0 ? " selected" : "");
       card.dataset.id = b.id;
@@ -395,14 +403,14 @@
       };
       picker.appendChild(card);
     });
-    if (state.menu.branches.length) state.branchId = state.menu.branches[0].id;
+    if (openBranches.length) state.branchId = openBranches[0].id;
   }
 
   // ----- Submit order ----------------------------------------------------
   $("submitBtn").onclick = async () => {
     const addr = $("inputAddress").value.trim();
     const time = $("inputTime").value.trim();
-    if (!addr) { showErr(T("err_addr")); return; }
+    if (state.deliveryType === "delivery" && !addr) { showErr(T("err_addr")); return; }
     const finalTime = time || "—";
     if (cartCount() === 0) { showErr(T("err_cart_empty")); return; }
     if (!initData && !fallbackUid) {
