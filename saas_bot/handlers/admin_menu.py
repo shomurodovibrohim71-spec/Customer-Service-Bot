@@ -610,19 +610,36 @@ def _edit_branch_keyboard(branch_id: int) -> InlineKeyboardMarkup:
 
 
 async def editbranch_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Replacement for the old text-dump + delete-list combo: a clean inline list."""
+    """Open admin branches webapp."""
     if not await _admin_guard(update, _tenant(context), context):
         return
+    tenant = _tenant(context)
     db = _db(context)
-    branches = await db.list_branches()
-    if not branches:
-        await update.message.reply_text("🏪 Filiallar yo'q.")
+
+    from config.settings import get_webapp_url
+    from telegram import KeyboardButton, ReplyKeyboardMarkup, WebAppInfo
+    from utils.helpers import home_button_label
+    webapp_url = get_webapp_url()
+    if not webapp_url or not update.effective_user:
+        await update.message.reply_text("⚠️ WEBAPP_URL sozlanmagan. .env faylini tekshiring.")
         return
-    await update.message.reply_text(
-        f"🏪 *Filiallar ({len(branches)} ta)*\nTahrirlash uchun ustiga bosing.",
-        parse_mode=ParseMode.MARKDOWN,
-        reply_markup=_branches_list_keyboard(branches),
+
+    lang = (await db.get_user(update.effective_user.id) or {}).get("language") or tenant.default_language
+    url = f"{webapp_url}/webapp/admin/branches?tenant={tenant.id}&uid={update.effective_user.id}&lang={lang}"
+    btn_labels = {
+        "uz": ("🏪 Filiallarni boshqarish", "🏪 Pastdagi tugmani bosing."),
+        "en": ("🏪 Manage branches",         "🏪 Tap the button below."),
+        "ru": ("🏪 Управление филиалами",    "🏪 Нажмите кнопку ниже."),
+    }
+    btn, intro = btn_labels.get(lang, btn_labels["uz"])
+    kb = ReplyKeyboardMarkup(
+        [
+            [KeyboardButton(text=btn, web_app=WebAppInfo(url=url))],
+            [KeyboardButton(text=home_button_label(lang))],
+        ],
+        resize_keyboard=True,
     )
+    await update.message.reply_text(intro, reply_markup=kb)
 
 
 async def editbranch_open_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

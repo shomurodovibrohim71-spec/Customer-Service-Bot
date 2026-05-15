@@ -14,6 +14,7 @@ Flow:
 """
 from __future__ import annotations
 
+import json
 import logging
 
 from telegram import (
@@ -96,19 +97,19 @@ def _categories_keyboard(tenant: Tenant, lang: str, categories: list[str], cart_
             callback_data="cart_view",
         )])
     rows.append([
-        InlineKeyboardButton("⬅ Orqaga", callback_data="back_to_delivery"),
-        InlineKeyboardButton("❌ Bekor", callback_data="order_cancel"),
+        InlineKeyboardButton(tenant.t(lang, "btn_back"), callback_data="back_to_delivery"),
+        InlineKeyboardButton(tenant.t(lang, "btn_cancel"), callback_data="order_cancel"),
     ])
     return InlineKeyboardMarkup(rows)
 
 
 def _product_keyboard(product_id: int, cat: str, in_cart: int, cart_n: int, tenant: Tenant, lang: str) -> InlineKeyboardMarkup:
     if in_cart == 0:
-        first_row = [InlineKeyboardButton("➕ Qo'shish", callback_data=f"add:{product_id}:{cat}")]
+        first_row = [InlineKeyboardButton(tenant.t(lang, "btn_add_to_cart"), callback_data=f"add:{product_id}:{cat}")]
     else:
         first_row = [
             InlineKeyboardButton("➖", callback_data=f"dec:{product_id}:{cat}"),
-            InlineKeyboardButton(f"{in_cart}", callback_data="noop"),
+            InlineKeyboardButton(f"  {in_cart}  ", callback_data="noop"),
             InlineKeyboardButton("➕", callback_data=f"inc:{product_id}:{cat}"),
         ]
     rows = [first_row]
@@ -144,26 +145,28 @@ def _cart_keyboard(tenant: Tenant, lang: str, cart: dict[int, int], products_by_
     return InlineKeyboardMarkup(rows)
 
 
-def _addr_confirm_keyboard() -> InlineKeyboardMarkup:
+def _addr_confirm_keyboard(tenant: Tenant, lang: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("✅ Ha", callback_data="addr_yes"),
-         InlineKeyboardButton("❌ Yo'q", callback_data="addr_no")],
-        [InlineKeyboardButton("🏠 Bosh menyu", callback_data="order_cancel")],
+        [InlineKeyboardButton(tenant.t(lang, "btn_yes"), callback_data="addr_yes"),
+         InlineKeyboardButton(tenant.t(lang, "btn_no"), callback_data="addr_no")],
+        [InlineKeyboardButton(tenant.t(lang, "btn_cancel"), callback_data="order_cancel")],
     ])
 
 
-def _time_prompt_keyboard() -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([[
-        InlineKeyboardButton("⬅ Orqaga", callback_data="back_to_cart"),
-        InlineKeyboardButton("❌ Bekor", callback_data="order_cancel"),
-    ]])
+def _time_prompt_keyboard(tenant: Tenant, lang: str) -> InlineKeyboardMarkup:
+    rows = [
+        [InlineKeyboardButton(tenant.t(lang, "time_asap"), callback_data="time_asap")],
+        [InlineKeyboardButton(tenant.t(lang, "btn_back"), callback_data="back_to_cart"),
+         InlineKeyboardButton(tenant.t(lang, "btn_cancel"), callback_data="order_cancel")],
+    ]
+    return InlineKeyboardMarkup(rows)
 
 
-def _confirm_keyboard_with_back() -> InlineKeyboardMarkup:
+def _confirm_keyboard_with_back(tenant: Tenant, lang: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("✅ Tasdiqlash", callback_data="order_confirm")],
-        [InlineKeyboardButton("⬅ Orqaga", callback_data="back_to_time"),
-         InlineKeyboardButton("❌ Bekor", callback_data="order_cancel")],
+        [InlineKeyboardButton(tenant.t(lang, "btn_confirm_order"), callback_data="order_confirm")],
+        [InlineKeyboardButton(tenant.t(lang, "btn_back"), callback_data="back_to_time"),
+         InlineKeyboardButton(tenant.t(lang, "btn_cancel"), callback_data="order_cancel")],
     ])
 
 
@@ -234,7 +237,7 @@ async def order_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         context.user_data["order"]["address_candidate"] = latest["text"]
         await update.message.reply_text(
             tenant.t(lang, "order_confirm_address", address=latest["text"]),
-            reply_markup=_addr_confirm_keyboard(),
+            reply_markup=_addr_confirm_keyboard(tenant, lang),
         )
         return ADDR_CONFIRM
 
@@ -255,9 +258,10 @@ async def addr_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     tenant = _tenant(context)
     lang = context.user_data["order"]["lang"]
     if query.data == "addr_yes":
-        context.user_data["order"]["address"] = context.user_data["order"]["address_candidate"]
+        context.user_data["order"]["address"] = context.user_data["order"].pop("address_candidate", "")
         return await _ask_delivery_method(query, context, tenant, lang)
-    # addr_no
+    # addr_no — clear candidate and ask for a new address
+    context.user_data["order"].pop("address_candidate", None)
     await query.edit_message_text(
         tenant.t(lang, "order_no_address"),
         parse_mode=ParseMode.MARKDOWN,
@@ -405,6 +409,8 @@ async def delivery_method_handler(update: Update, context: ContextTypes.DEFAULT_
         # Show distance in button labels when available.
         rows = []
         for b in ranked:
+            if b.get("is_open", 1) == 0:
+                continue  # skip closed branches
             d = b.get("distance_km")
             if d is not None:
                 label = tenant.t(lang, "branch_distance_btn", name=b["name"], dist=d)
@@ -416,7 +422,7 @@ async def delivery_method_handler(update: Update, context: ContextTypes.DEFAULT_
             rows.append([InlineKeyboardButton(
                 tenant.t(lang, "show_all_branches"), callback_data="pickbranch_all"
             )])
-        rows.append([InlineKeyboardButton("❌ Bekor qilish", callback_data="order_cancel")])
+        rows.append([InlineKeyboardButton(tenant.t(lang, "btn_cancel"), callback_data="order_cancel")])
         header_key = "pickup_nearest_header" if (user_lat is not None and user_lon is not None) else "pickup_no_coords"
         await update.message.reply_text(
             tenant.t(lang, header_key),
@@ -445,11 +451,11 @@ async def pickup_branch_handler(update: Update, context: ContextTypes.DEFAULT_TY
     if query.data == "order_cancel":
         return await _cancel(update, context)
     if query.data == "pickbranch_all":
-        # Show the unfiltered list (no distance trim).
+        # Show all open branches (no distance trim).
         branches = await db.list_branches()
         rows = [[InlineKeyboardButton(b["name"], callback_data=f"pickbranch:{b['id']}")]
-                for b in branches]
-        rows.append([InlineKeyboardButton("❌ Bekor qilish", callback_data="order_cancel")])
+                for b in branches if b.get("is_open", 1) != 0]
+        rows.append([InlineKeyboardButton(tenant.t(lang, "btn_cancel"), callback_data="order_cancel")])
         await query.edit_message_text(
             tenant.t(lang, "pickup_no_coords"),
             reply_markup=InlineKeyboardMarkup(rows),
@@ -528,7 +534,10 @@ async def pick_category(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     chat_id = query.message.chat_id
     for p in products:
         in_cart = cart.get(p["id"], 0)
-        caption = f"*{p['name']}*\n💰 {p['price']}\n\n_{p.get('description','')}_"
+        desc = p.get("description") or ""
+        caption = f"*{p['name']}*\n💰 {p['price']}"
+        if desc:
+            caption += f"\n\n{desc}"
         kb = _product_keyboard(p["id"], cat, in_cart, cart_n, tenant, lang)
         if p.get("image_url"):
             try:
@@ -566,12 +575,11 @@ async def cart_action(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     pid = int(parts[1])
     cat = parts[2] if len(parts) > 2 else context.user_data["order"].get("current_category", "")
 
-    if op == "add" or op == "inc":
+    if op in ("add", "inc"):
         cart_add(context.user_data, pid, 1)
     elif op == "dec":
-        get_cart(context.user_data)[pid] = get_cart(context.user_data).get(pid, 0) - 1
-        if get_cart(context.user_data)[pid] <= 0:
-            get_cart(context.user_data).pop(pid, None)
+        cur = get_cart(context.user_data).get(pid, 0)
+        cart_set(context.user_data, pid, cur - 1)
 
     await query.answer(tenant.t(lang, "order_added_toast") if op in ("add", "inc") else "—")
 
@@ -638,7 +646,7 @@ async def cart_inline_action(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await query.edit_message_text(
             tenant.t(lang, "order_ask_time_v2"),
             parse_mode=ParseMode.MARKDOWN,
-            reply_markup=_time_prompt_keyboard(),
+            reply_markup=_time_prompt_keyboard(tenant, lang),
         )
         return ASK_TIME
     if data.startswith("cinc:") or data.startswith("cdec:"):
@@ -670,14 +678,11 @@ async def cart_inline_action(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 # ========================================================== Checkout
 
-async def ask_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    if update.message is None or not update.message.text:
-        return ASK_TIME
-    tenant = _tenant(context)
+async def _build_confirm_summary(update_or_query, context, tenant: Tenant, lang: str, time_str: str) -> int:
+    """Shared helper: build order summary and show confirm keyboard."""
     db = _db(context)
-    lang = context.user_data["order"]["lang"]
-    context.user_data["order"]["preferred_time"] = update.message.text.strip()
     order = context.user_data["order"]
+    order["preferred_time"] = time_str
     products = await db.list_products()
     by_id = {p["id"]: p for p in products}
     lines = "\n".join(cart_lines(context.user_data, by_id))
@@ -685,19 +690,42 @@ async def ask_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     order["total"] = total
     summary = tenant.t(
         lang, "order_summary",
-        address=order["address"],
-        preferred_time=order["preferred_time"],
+        address=order.get("address", "-"),
+        preferred_time=time_str,
         delivery_label=order.get("delivery_label", "-"),
         branch=order.get("branch", "-"),
         lines=lines,
         total=total,
     )
-    await update.message.reply_text(
-        summary,
-        parse_mode=ParseMode.MARKDOWN,
-        reply_markup=_confirm_keyboard_with_back(),
-    )
+    kb = _confirm_keyboard_with_back(tenant, lang)
+    if hasattr(update_or_query, "edit_message_text"):
+        await update_or_query.edit_message_text(summary, parse_mode=ParseMode.MARKDOWN, reply_markup=kb)
+    elif hasattr(update_or_query, "reply_text"):
+        await update_or_query.reply_text(summary, parse_mode=ParseMode.MARKDOWN, reply_markup=kb)
+    else:
+        await update_or_query.message.reply_text(summary, parse_mode=ParseMode.MARKDOWN, reply_markup=kb)
     return CONFIRM
+
+
+async def ask_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    if update.message is None or not update.message.text:
+        return ASK_TIME
+    tenant = _tenant(context)
+    lang = context.user_data["order"]["lang"]
+    time_str = update.message.text.strip()
+    return await _build_confirm_summary(update.message, context, tenant, lang, time_str)
+
+
+async def ask_time_asap(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """ASAP quick-time callback button."""
+    query = update.callback_query
+    if query is None:
+        return ASK_TIME
+    await query.answer()
+    tenant = _tenant(context)
+    lang = context.user_data["order"]["lang"]
+    time_str = tenant.t(lang, "time_asap_value")
+    return await _build_confirm_summary(query, context, tenant, lang, time_str)
 
 
 async def confirm_order(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -718,6 +746,15 @@ async def confirm_order(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     by_id = {p["id"]: p for p in products}
     lines = cart_lines(context.user_data, by_id)
     service_summary = "; ".join(lines) if lines else "-"
+    total = int(order.get("total", 0))
+
+    # Build items_json for admin dashboard / history
+    cart = get_cart(context.user_data)
+    items_for_json = [
+        {"product_id": pid, "name": by_id[pid]["name"], "qty": qty,
+         "price": int(by_id[pid].get("price_value") or 0)}
+        for pid, qty in cart.items() if pid in by_id
+    ]
 
     order_id = await db.create_order(
         user_id=user.id,
@@ -727,9 +764,11 @@ async def confirm_order(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         preferred_time=order.get("preferred_time", ""),
         branch=order.get("branch", ""),
         address=order.get("address", ""),
+        payment_method=order.get("payment_method", "cash"),
+        amount=total,
+        items_json=json.dumps(items_for_json, ensure_ascii=False),
     )
     # Award loyalty points (5% of total).
-    total = int(order.get("total", 0))
     if total > 0:
         await db.add_points(user.id, total * 0.05)
 
@@ -749,15 +788,20 @@ async def confirm_order(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 
 
 async def _notify_admins(context, tenant: Tenant, order_id: int, order: dict, user, lines: list[str], total: int):
+    pay_method = order.get("payment_method", "cash")
+    pay_icon = "💳" if pay_method == "card" else "💵"
+    pay_label = "Karta" if pay_method == "card" else "Naqd"
+    items_block = "\n".join(f"  • {l}" for l in lines) if lines else "  —"
     text = (
-        f"🆕 *Yangi buyurtma* #{order_id}\n\n"
-        f"👤 {order.get('full_name')} (@{user.username or '-'})\n"
-        f"📞 {order.get('phone')}\n"
-        f"🚚 Usul: {order.get('delivery_label', '-')}\n"
-        f"🏪 Filial: {order.get('branch', '-')}\n"
-        f"📍 {order.get('address')}\n"
-        f"🕐 {order.get('preferred_time')}\n\n"
-        f"🛒 *Mahsulotlar:*\n" + "\n".join(lines) + f"\n\n💰 *Jami:* {total:,} so'm"
+        f"🆕 *Yangi buyurtma* \\#{order_id}\n\n"
+        f"👤 {order.get('full_name', '—')} (@{user.username or '—'})\n"
+        f"📞 {order.get('phone', '—')}\n"
+        f"🚚 {order.get('delivery_label', '-')}  |  🏪 {order.get('branch', '-')}\n"
+        f"📍 {order.get('address', '—')}\n"
+        f"🕐 {order.get('preferred_time', '—')}\n"
+        f"{pay_icon} To'lov: *{pay_label}*\n\n"
+        f"🛒 *Buyurtma:*\n{items_block}\n\n"
+        f"💰 *Jami: {total:,} so'm*"
     )
     for admin_id in tenant.admin_ids:
         try:
@@ -845,7 +889,7 @@ async def back_to_time(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     await query.edit_message_text(
         tenant.t(lang, "order_ask_time_v2"),
         parse_mode=ParseMode.MARKDOWN,
-        reply_markup=_time_prompt_keyboard(),
+        reply_markup=_time_prompt_keyboard(tenant, lang),
     )
     return ASK_TIME
 
@@ -860,12 +904,18 @@ def register(app: Application, tenant: Tenant) -> None:
             CommandHandler("order", order_start),
         ],
         states={
-            ADDR_CONFIRM: [CallbackQueryHandler(addr_confirm, pattern=r"^addr_(yes|no)$")],
+            ADDR_CONFIRM: [
+                CallbackQueryHandler(addr_confirm, pattern=r"^addr_(yes|no)$"),
+                CallbackQueryHandler(_cancel, pattern=r"^order_cancel$"),
+            ],
             ADDR_INPUT: [
                 MessageHandler(filters.LOCATION, addr_input),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, addr_input),
             ],
-            GEO_CONFIRM: [CallbackQueryHandler(geo_confirm, pattern=r"^geo_(yes|no)$")],
+            GEO_CONFIRM: [
+                CallbackQueryHandler(geo_confirm, pattern=r"^geo_(yes|no)$"),
+                CallbackQueryHandler(_cancel, pattern=r"^order_cancel$"),
+            ],
             DELIVERY_METHOD: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, delivery_method_handler),
             ],
@@ -884,6 +934,7 @@ def register(app: Application, tenant: Tenant) -> None:
                 CallbackQueryHandler(noop_callback, pattern=r"^noop$"),
             ],
             ASK_TIME: [
+                CallbackQueryHandler(ask_time_asap, pattern=r"^time_asap$"),
                 CallbackQueryHandler(back_to_cart, pattern=r"^back_to_cart$"),
                 CallbackQueryHandler(_cancel, pattern=r"^order_cancel$"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, ask_time),
@@ -899,3 +950,5 @@ def register(app: Application, tenant: Tenant) -> None:
         conversation_timeout=900,
     )
     app.add_handler(conv, group=1)
+    # Noop handler outside conversation (e.g., old product card buttons after session timeout)
+    app.add_handler(CallbackQueryHandler(noop_callback, pattern=r"^noop$"))

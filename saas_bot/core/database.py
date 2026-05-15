@@ -195,6 +195,8 @@ _MIGRATIONS = [
     ("feedback", "category",    "TEXT DEFAULT 'question'"),
     ("feedback", "ai_response", "TEXT"),
     ("feedback", "status",      "TEXT DEFAULT 'open'"),
+    # Branch open/closed manual override (NULL = use hours schedule, 1 = forced open, 0 = forced closed).
+    ("branches", "is_open",     "INTEGER DEFAULT 1"),
 ]
 
 
@@ -683,6 +685,34 @@ class Database:
         cur = await self.conn.execute(
             "UPDATE branches SET is_active=0 WHERE id=? AND tenant_id=?",
             (branch_id, self.tenant_id),
+        )
+        await self.conn.commit()
+        return cur.rowcount > 0
+
+    async def set_branch_open(self, branch_id: int, is_open: bool) -> bool:
+        cur = await self.conn.execute(
+            "UPDATE branches SET is_open=? WHERE id=? AND tenant_id=?",
+            (1 if is_open else 0, branch_id, self.tenant_id),
+        )
+        await self.conn.commit()
+        return cur.rowcount > 0
+
+    async def update_branch(
+        self,
+        branch_id: int,
+        name: str,
+        address: str,
+        phone: str = "",
+        lat: float | None = None,
+        lon: float | None = None,
+        maps_url: str = "",
+        hours_json: str = "",
+    ) -> bool:
+        cur = await self.conn.execute(
+            """UPDATE branches
+               SET name=?, address=?, phone=?, lat=?, lon=?, maps_url=?, hours_json=?
+               WHERE id=? AND tenant_id=?""",
+            (name, address, phone, lat, lon, maps_url, hours_json, branch_id, self.tenant_id),
         )
         await self.conn.commit()
         return cur.rowcount > 0

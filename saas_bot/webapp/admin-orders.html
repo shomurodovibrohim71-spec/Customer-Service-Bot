@@ -7,37 +7,264 @@
   <title>Orders</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <link rel="stylesheet" href="/static/styles.css">
+  <style>
+    /* ── Admin Orders — premium redesign ─────────────────────────── */
+    body { background: var(--bg); }
+
+    .ao-topbar {
+      position: sticky; top: 0; z-index: 10;
+      background: rgba(15,17,21,0.92);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border-bottom: 1px solid var(--line);
+      padding: 12px 16px 0;
+    }
+    .ao-topbar-row {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .ao-title { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
+    .ao-count-pill {
+      background: var(--brand-grad);
+      color: #fff; font-size: 12px; font-weight: 700;
+      padding: 3px 10px; border-radius: var(--r-pill);
+    }
+
+    /* Tabs */
+    .ao-tabs {
+      display: flex; gap: 6px; overflow-x: auto;
+      scrollbar-width: none; padding-bottom: 12px;
+    }
+    .ao-tabs::-webkit-scrollbar { display: none; }
+    .ao-tab {
+      flex-shrink: 0; display: flex; align-items: center; gap: 6px;
+      padding: 8px 14px; border-radius: var(--r-pill);
+      background: var(--surface); border: 1px solid var(--line);
+      font-size: 13px; font-weight: 600; color: var(--text-muted);
+      cursor: pointer; white-space: nowrap;
+      transition: all .2s var(--ease);
+    }
+    .ao-tab .ao-cnt {
+      background: var(--bg-soft);
+      padding: 1px 7px; border-radius: var(--r-pill);
+      font-size: 11px; font-weight: 800; color: var(--text);
+      transition: all .2s;
+    }
+    .ao-tab.active { background: var(--brand-grad); border-color: transparent; color: #fff; }
+    .ao-tab.active .ao-cnt { background: rgba(255,255,255,0.22); color: #fff; }
+
+    /* Search */
+    .ao-search-wrap { padding: 12px 14px 0; }
+    .ao-search {
+      width: 100%; padding: 12px 16px 12px 42px;
+      background: var(--surface); border: 1px solid var(--line);
+      border-radius: var(--r-lg); color: var(--text);
+      font-size: 14px; position: relative;
+      transition: border-color .2s;
+      box-sizing: border-box;
+    }
+    .ao-search:focus { outline: none; border-color: var(--brand); }
+    .ao-search-wrap { position: relative; }
+    .ao-search-icon {
+      position: absolute; left: 28px; top: 50%;
+      transform: translateY(-50%);
+      font-size: 16px; pointer-events: none;
+    }
+
+    /* List */
+    .ao-list { padding: 12px 14px 100px; display: flex; flex-direction: column; gap: 10px; }
+
+    /* Order card */
+    .ao-card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--r-lg);
+      overflow: hidden;
+      cursor: pointer;
+      transition: border-color .2s var(--ease), transform .15s var(--ease);
+      position: relative;
+    }
+    .ao-card:active { transform: scale(0.99); border-color: var(--brand); }
+    .ao-card-stripe {
+      position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+      border-radius: var(--r-lg) 0 0 var(--r-lg);
+    }
+    .stripe-pending   { background: var(--warning); }
+    .stripe-confirmed { background: #4ade80; }
+    .stripe-delivered { background: var(--accent); }
+    .stripe-cancelled { background: var(--danger); }
+
+    .ao-card-inner { padding: 14px 14px 14px 18px; display: flex; flex-direction: column; gap: 8px; }
+
+    .ao-card-head {
+      display: flex; align-items: flex-start;
+      justify-content: space-between; gap: 8px;
+    }
+    .ao-card-id-wrap { display: flex; align-items: center; gap: 8px; }
+    .ao-card-id { font-size: 16px; font-weight: 800; letter-spacing: -0.01em; }
+    .ao-card-date { font-size: 11px; color: var(--text-muted); font-weight: 500; }
+
+    .ao-status {
+      font-size: 11px; font-weight: 700; padding: 3px 10px;
+      border-radius: var(--r-pill); white-space: nowrap; flex-shrink: 0;
+    }
+    .st-pending   { background: rgba(255,176,32,0.18); color: var(--warning); }
+    .st-confirmed { background: rgba(74,222,128,0.18); color: #4ade80; }
+    .st-delivered { background: rgba(106,203,255,0.18); color: var(--accent); }
+    .st-cancelled { background: rgba(255,93,93,0.18); color: var(--danger); }
+
+    .ao-card-user {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    }
+    .ao-card-name { font-size: 14px; font-weight: 700; }
+    .ao-card-phone {
+      font-size: 13px; color: var(--accent);
+      text-decoration: none; font-weight: 600;
+    }
+    .ao-card-uname { font-size: 12px; color: var(--text-muted); }
+
+    .ao-card-addr {
+      font-size: 12px; color: var(--text-muted); line-height: 1.4;
+      display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .ao-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+    .ao-chip {
+      display: flex; align-items: center; gap: 4px;
+      background: var(--bg-soft); border-radius: var(--r-pill);
+      padding: 3px 10px; font-size: 12px; font-weight: 600;
+    }
+    .ao-chip-qty { color: var(--brand); font-weight: 800; }
+    .ao-chip-more { color: var(--text-muted); background: transparent; }
+
+    .ao-card-foot {
+      display: flex; align-items: center;
+      justify-content: space-between; gap: 10px;
+      padding-top: 8px; border-top: 1px solid var(--line);
+    }
+    .ao-card-total { font-size: 18px; font-weight: 800; color: var(--brand); }
+    .ao-pay-badge {
+      font-size: 11px; font-weight: 700;
+      padding: 3px 9px; border-radius: var(--r-pill);
+      background: var(--bg-soft); color: var(--text-muted);
+    }
+    .ao-open-btn {
+      background: var(--brand-grad); border: none;
+      color: #fff; font-size: 12px; font-weight: 700;
+      padding: 8px 14px; border-radius: var(--r-pill);
+      cursor: pointer; flex-shrink: 0;
+      transition: filter .15s;
+    }
+    .ao-open-btn:active { filter: brightness(0.88); }
+
+    /* Quick action buttons on card */
+    .ao-quick-actions {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 6px; padding-top: 4px;
+    }
+    .ao-qa-btn {
+      padding: 9px 0; border-radius: var(--r-md);
+      font-size: 12px; font-weight: 700;
+      border: none; cursor: pointer;
+      transition: filter .15s, transform .1s;
+    }
+    .ao-qa-btn:active { filter: brightness(0.88); transform: scale(0.98); }
+    .ao-qa-confirm  { background: rgba(74,222,128,0.18); color: #4ade80; }
+    .ao-qa-deliver  { background: rgba(106,203,255,0.18); color: var(--accent); }
+    .ao-qa-cancel   { background: rgba(255,93,93,0.14); color: var(--danger); }
+
+    /* Detail screen */
+    .ao-detail-content { padding: 14px 14px 100px; display: flex; flex-direction: column; gap: 12px; }
+
+    .ao-detail-section {
+      background: var(--surface); border: 1px solid var(--line);
+      border-radius: var(--r-lg); overflow: hidden;
+    }
+    .ao-detail-section-head {
+      padding: 12px 14px; border-bottom: 1px solid var(--line);
+      font-size: 12px; font-weight: 700; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.06em;
+    }
+    .ao-detail-row {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 10px 14px; font-size: 14px;
+      border-bottom: 1px solid var(--line);
+    }
+    .ao-detail-row:last-child { border-bottom: none; }
+    .ao-detail-key { color: var(--text-muted); font-size: 13px; flex: 0 0 90px; }
+    .ao-detail-val { flex: 1; font-weight: 600; word-break: break-word; }
+
+    .ao-items-section { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); overflow: hidden; }
+    .ao-item-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 14px; border-bottom: 1px solid var(--line);
+      font-size: 14px;
+    }
+    .ao-item-row:last-child { border-bottom: none; }
+    .ao-item-name { flex: 1; font-weight: 600; }
+    .ao-item-qty { color: var(--text-muted); font-weight: 700; font-size: 12px; }
+    .ao-item-price { color: var(--brand); font-weight: 800; }
+
+    .ao-total-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 12px 14px; font-size: 16px;
+      border-top: 1px solid var(--line);
+      background: var(--bg-soft);
+    }
+    .ao-total-row strong { font-size: 20px; color: var(--brand); font-weight: 800; }
+
+    .ao-detail-actions { display: flex; flex-direction: column; gap: 8px; }
+    .ao-detail-actions .primary-btn, .ao-detail-actions .ghost-btn { margin: 0; }
+
+    .ao-empty { text-align: center; padding: 64px 20px; color: var(--text-muted); font-size: 15px; }
+    .ao-empty-icon { font-size: 48px; margin-bottom: 12px; }
+  </style>
 </head>
 <body>
-  <header class="topbar">
-    <div class="page-title" data-t="page_title">🛒 Buyurtmalar</div>
-    <div class="page-sub" id="totalCount">—</div>
-  </header>
 
-  <nav class="tabs" id="ordTabs">
-    <button class="tab active" data-st="today">
-      <span data-t="tab_today">🟢 Bugun</span> · <span id="cnt_today">0</span>
-    </button>
-    <button class="tab" data-st="all">
-      <span data-t="tab_all">Hammasi</span> · <span id="cnt_all">0</span>
-    </button>
-    <button class="tab" data-st="confirmed">
-      <span data-t="tab_confirmed">✅ Tasdiqlangan</span> · <span id="cnt_confirmed">0</span>
-    </button>
-    <button class="tab" data-st="delivered">
-      <span data-t="tab_delivered">📦 Yetkazilgan</span> · <span id="cnt_delivered">0</span>
-    </button>
-    <button class="tab" data-st="cancelled">
-      <span data-t="tab_cancelled">❌ Bekor</span> · <span id="cnt_cancelled">0</span>
-    </button>
-  </nav>
-
-  <main class="content">
-    <input id="searchInput" class="search-input" type="text" data-t-placeholder="ph_search" placeholder="🔎 ID yoki telefon bo'yicha qidirish…">
-    <div id="list">
-      <div class="loading" data-t="loading">Yuklanmoqda…</div>
+  <!-- Sticky top bar -->
+  <div class="ao-topbar">
+    <div class="ao-topbar-row">
+      <div class="ao-title" data-t="page_title">🛒 Buyurtmalar</div>
+      <div class="ao-count-pill" id="totalCount">0</div>
     </div>
-  </main>
+    <div class="ao-tabs" id="ordTabs">
+      <button class="ao-tab active" data-st="today">
+        <span data-t="tab_today">🟢 Bugun</span>
+        <span class="ao-cnt" id="cnt_today">0</span>
+      </button>
+      <button class="ao-tab" data-st="all">
+        <span data-t="tab_all">Hammasi</span>
+        <span class="ao-cnt" id="cnt_all">0</span>
+      </button>
+      <button class="ao-tab" data-st="confirmed">
+        <span data-t="tab_confirmed">✅</span>
+        <span class="ao-cnt" id="cnt_confirmed">0</span>
+      </button>
+      <button class="ao-tab" data-st="delivered">
+        <span data-t="tab_delivered">📦</span>
+        <span class="ao-cnt" id="cnt_delivered">0</span>
+      </button>
+      <button class="ao-tab" data-st="cancelled">
+        <span data-t="tab_cancelled">❌</span>
+        <span class="ao-cnt" id="cnt_cancelled">0</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Search -->
+  <div class="ao-search-wrap">
+    <span class="ao-search-icon">🔎</span>
+    <input id="searchInput" class="ao-search" type="text"
+           data-t-placeholder="ph_search"
+           placeholder="ID yoki telefon bo'yicha qidirish…">
+  </div>
+
+  <!-- Order list -->
+  <div id="list" class="ao-list">
+    <div class="loading" data-t="loading">Yuklanmoqda…</div>
+  </div>
 
   <!-- Detail screen -->
   <section id="detailScreen" class="screen hidden">
@@ -45,10 +272,10 @@
       <button class="back-btn" id="detailBack" type="button" data-t="back">Orqaga</button>
       <h2 id="detailTitle">—</h2>
     </header>
-    <div class="content order-detail">
-      <div id="detailBody"><div class="loading" data-t="loading">Yuklanmoqda…</div></div>
-      <div id="detailErr" class="err hidden"></div>
+    <div class="ao-detail-content" id="detailBody">
+      <div class="loading" data-t="loading">Yuklanmoqda…</div>
     </div>
+    <div id="detailErr" class="err hidden" style="margin:14px"></div>
   </section>
 
   <script>
@@ -56,56 +283,59 @@
       uz: {
         page_title: "🛒 Buyurtmalar", loading: "Yuklanmoqda…", back: "Orqaga",
         tab_today: "🟢 Bugun", tab_all: "Hammasi",
-        tab_confirmed: "✅ Tasdiqlangan",
-        tab_delivered: "📦 Yetkazilgan", tab_cancelled: "❌ Bekor",
+        tab_confirmed: "✅ Tasdiqlangan", tab_delivered: "📦 Yetkazilgan", tab_cancelled: "❌ Bekor",
         ph_search: "🔎 ID yoki telefon bo'yicha qidirish…",
         empty: "Bu bo'limda buyurtmalar yo'q.", total_short: "{n} ta",
-        lbl_customer: "👤 Mijoz", lbl_phone: "📞", lbl_branch: "🏪 Filial",
-        lbl_address: "📍 Manzil", lbl_time: "🕐 Vaqt", lbl_payment: "💳 To'lov",
-        lbl_items: "🛒 Mahsulotlar", lbl_total: "💰 Jami", lbl_discount: "🎟 Chegirma",
-        lbl_promo: "Promokod", lbl_placed: "📅 Buyurtma vaqti",
+        lbl_customer: "Mijoz", lbl_phone: "Telefon", lbl_branch: "Filial",
+        lbl_address: "Manzil", lbl_time: "Vaqt", lbl_payment: "To'lov",
+        lbl_items: "🛒 Mahsulotlar", lbl_total: "Jami", lbl_discount: "Chegirma",
+        lbl_promo: "Promokod", lbl_placed: "Vaqt", lbl_delivery: "Usul",
         pay_cash: "💵 Naqd", pay_card: "💳 Karta",
         status_pending: "⏳ Kutilmoqda", status_confirmed: "✅ Tasdiqlangan",
         status_delivered: "📦 Yetkazilgan", status_cancelled: "❌ Bekor qilingan",
         act_confirm: "✅ Tasdiqlash", act_delivered: "📦 Yetkazildi", act_cancel: "❌ Bekor qilish",
         confirm_cancel: "Buyurtma #{id} bekor qilinsinmi?",
-        soum: "so'm", x_qty: "× {q}", updated: "✅ Yangilandi", view_details: "📋 Batafsil",
+        soum: "so'm", x_qty: "× {q}", updated: "✅ Yangilandi", view_details: "Batafsil →",
+        lbl_note_courier: "🚗 Kuryerga", lbl_note_rest: "🍴 Restoranga",
+        delivery_delivery: "🚚 Yetkazib berish", delivery_pickup: "🚶 Olib ketish",
       },
       en: {
         page_title: "🛒 Orders", loading: "Loading…", back: "Back",
         tab_today: "🟢 Today", tab_all: "All",
-        tab_confirmed: "✅ Confirmed",
-        tab_delivered: "📦 Delivered", tab_cancelled: "❌ Cancelled",
+        tab_confirmed: "✅ Confirmed", tab_delivered: "📦 Delivered", tab_cancelled: "❌ Cancelled",
         ph_search: "🔎 Search by ID or phone…",
-        empty: "No orders in this category.", total_short: "{n}",
-        lbl_customer: "👤 Customer", lbl_phone: "📞", lbl_branch: "🏪 Branch",
-        lbl_address: "📍 Address", lbl_time: "🕐 Time", lbl_payment: "💳 Payment",
-        lbl_items: "🛒 Items", lbl_total: "💰 Total", lbl_discount: "🎟 Discount",
-        lbl_promo: "Promo", lbl_placed: "📅 Placed",
+        empty: "No orders in this section.", total_short: "{n}",
+        lbl_customer: "Customer", lbl_phone: "Phone", lbl_branch: "Branch",
+        lbl_address: "Address", lbl_time: "Time", lbl_payment: "Payment",
+        lbl_items: "🛒 Items", lbl_total: "Total", lbl_discount: "Discount",
+        lbl_promo: "Promo", lbl_placed: "Placed", lbl_delivery: "Method",
         pay_cash: "💵 Cash", pay_card: "💳 Card",
         status_pending: "⏳ Pending", status_confirmed: "✅ Confirmed",
         status_delivered: "📦 Delivered", status_cancelled: "❌ Cancelled",
         act_confirm: "✅ Confirm", act_delivered: "📦 Mark delivered", act_cancel: "❌ Cancel",
         confirm_cancel: "Cancel order #{id}?",
-        soum: "so'm", x_qty: "× {q}", updated: "✅ Updated", view_details: "📋 Details",
+        soum: "so'm", x_qty: "× {q}", updated: "✅ Updated", view_details: "Details →",
+        lbl_note_courier: "🚗 For courier", lbl_note_rest: "🍴 For restaurant",
+        delivery_delivery: "🚚 Delivery", delivery_pickup: "🚶 Pickup",
       },
       ru: {
         page_title: "🛒 Заказы", loading: "Загрузка…", back: "Назад",
         tab_today: "🟢 Сегодня", tab_all: "Все",
-        tab_confirmed: "✅ Подтверждённые",
-        tab_delivered: "📦 Доставленные", tab_cancelled: "❌ Отменённые",
+        tab_confirmed: "✅ Подтверждённые", tab_delivered: "📦 Доставленные", tab_cancelled: "❌ Отменённые",
         ph_search: "🔎 Поиск по ID или телефону…",
-        empty: "В этой категории заказов нет.", total_short: "{n}",
-        lbl_customer: "👤 Клиент", lbl_phone: "📞", lbl_branch: "🏪 Филиал",
-        lbl_address: "📍 Адрес", lbl_time: "🕐 Время", lbl_payment: "💳 Оплата",
-        lbl_items: "🛒 Товары", lbl_total: "💰 Итого", lbl_discount: "🎟 Скидка",
-        lbl_promo: "Промокод", lbl_placed: "📅 Оформлен",
+        empty: "В этом разделе заказов нет.", total_short: "{n}",
+        lbl_customer: "Клиент", lbl_phone: "Телефон", lbl_branch: "Филиал",
+        lbl_address: "Адрес", lbl_time: "Время", lbl_payment: "Оплата",
+        lbl_items: "🛒 Товары", lbl_total: "Итого", lbl_discount: "Скидка",
+        lbl_promo: "Промокод", lbl_placed: "Время", lbl_delivery: "Способ",
         pay_cash: "💵 Наличные", pay_card: "💳 Карта",
         status_pending: "⏳ В ожидании", status_confirmed: "✅ Подтверждён",
         status_delivered: "📦 Доставлен", status_cancelled: "❌ Отменён",
         act_confirm: "✅ Подтвердить", act_delivered: "📦 Доставлен", act_cancel: "❌ Отменить",
         confirm_cancel: "Отменить заказ #{id}?",
-        soum: "сум", x_qty: "× {q}", updated: "✅ Обновлено", view_details: "📋 Детали",
+        soum: "сум", x_qty: "× {q}", updated: "✅ Обновлено", view_details: "Детали →",
+        lbl_note_courier: "🚗 Курьеру", lbl_note_rest: "🍴 Ресторану",
+        delivery_delivery: "🚚 Доставка", delivery_pickup: "🚶 Самовывоз",
       },
     };
   </script>

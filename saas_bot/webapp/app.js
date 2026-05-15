@@ -160,6 +160,7 @@
 
   function renderProducts() {
     const content = $("content");
+    const scrollTop = content.scrollTop;
     content.innerHTML = "";
     const items = state.menu.products[state.activeCategory] || [];
     const header = document.createElement("h2");
@@ -171,11 +172,53 @@
     grid.className = "products-grid";
     items.forEach(p => grid.appendChild(productCard(p)));
     content.appendChild(grid);
+    content.scrollTop = scrollTop;
+  }
+
+  function _updateProductCardAction(p) {
+    const card = $("content").querySelector(`[data-pid="${p.id}"]`);
+    if (!card) return;
+    const existing = card.querySelector(".add-btn, .qty");
+    if (existing) existing.remove();
+    card.appendChild(_productActionEl(p));
+  }
+
+  function _productActionEl(p) {
+    const qty = state.cart[p.id] || 0;
+    if (qty === 0) {
+      const addBtn = document.createElement("button");
+      addBtn.className = "add-btn";
+      addBtn.textContent = T("add_to_cart");
+      addBtn.onclick = () => {
+        state.cart[p.id] = 1;
+        _updateProductCardAction(p);
+        refreshCartBar();
+      };
+      return addBtn;
+    }
+    const qctrl = document.createElement("div");
+    qctrl.className = "qty";
+    qctrl.innerHTML = `<button data-act="dec">➖</button><span>${qty}</span><button data-act="inc">➕</button>`;
+    qctrl.querySelector('[data-act="dec"]').onclick = () => {
+      state.cart[p.id]--;
+      if (state.cart[p.id] <= 0) delete state.cart[p.id];
+      _updateProductCardAction(p);
+      refreshCartBar();
+      if ($("cartScreen") && !$("cartScreen").classList.contains("hidden")) renderCartItems();
+    };
+    qctrl.querySelector('[data-act="inc"]').onclick = () => {
+      state.cart[p.id]++;
+      _updateProductCardAction(p);
+      refreshCartBar();
+      if ($("cartScreen") && !$("cartScreen").classList.contains("hidden")) renderCartItems();
+    };
+    return qctrl;
   }
 
   function productCard(p) {
     const card = document.createElement("div");
     card.className = "product-card";
+    card.dataset.pid = p.id;
 
     const img = document.createElement("div");
     img.className = "product-img";
@@ -187,28 +230,7 @@
     info.innerHTML = `<div class="product-price">${fmt(p.price_value)}</div>
                       <div class="product-name">${escapeHtml(p.name)}</div>`;
     card.appendChild(info);
-
-    const qty = state.cart[p.id] || 0;
-    if (qty === 0) {
-      const addBtn = document.createElement("button");
-      addBtn.className = "add-btn";
-      addBtn.textContent = T("add_to_cart");
-      addBtn.onclick = () => { state.cart[p.id] = 1; renderProducts(); refreshCartBar(); };
-      card.appendChild(addBtn);
-    } else {
-      const qctrl = document.createElement("div");
-      qctrl.className = "qty";
-      qctrl.innerHTML = `<button data-act="dec">➖</button><span>${qty}</span><button data-act="inc">➕</button>`;
-      qctrl.querySelector('[data-act="dec"]').onclick = () => {
-        state.cart[p.id]--;
-        if (state.cart[p.id] <= 0) delete state.cart[p.id];
-        renderProducts(); refreshCartBar();
-      };
-      qctrl.querySelector('[data-act="inc"]').onclick = () => {
-        state.cart[p.id]++; renderProducts(); refreshCartBar();
-      };
-      card.appendChild(qctrl);
-    }
+    card.appendChild(_productActionEl(p));
     return card;
   }
 
@@ -219,21 +241,26 @@
       return;
     }
     bar.classList.remove("hidden");
-    $("cartCount").textContent = cartCount();
+    const countEl = $("cartCount");
+    countEl.textContent = cartCount();
     $("cartTotal").textContent = fmt(cartTotal());
+    countEl.classList.remove("pop");
+    void countEl.offsetWidth; // reflow to restart animation
+    countEl.classList.add("pop");
   }
 
   $("cartBar").onclick = () => openCart();
 
   // ----- Cart screen -----------------------------------------------------
-  function openCart() {
-    openScreen("cartScreen");
-    const list = $("cartItems"); list.innerHTML = "";
+  function renderCartItems() {
+    const list = $("cartItems");
+    list.innerHTML = "";
     for (const [pid, qty] of Object.entries(state.cart)) {
       const p = findProduct(parseInt(pid));
       if (!p) continue;
       const row = document.createElement("div");
       row.className = "cart-item";
+      row.dataset.pid = p.id;
       row.innerHTML = `
         <div class="name">${escapeHtml(p.name)}<br><small>${fmt(p.price_value * qty)}</small></div>
         <div class="qty"><button data-act="dec">➖</button><span>${qty}</span><button data-act="inc">➕</button></div>
@@ -241,14 +268,22 @@
       row.querySelector('[data-act="dec"]').onclick = () => {
         state.cart[p.id]--;
         if (state.cart[p.id] <= 0) delete state.cart[p.id];
-        openCart(); refreshCartBar(); renderProducts();
+        renderCartItems(); refreshCartBar();
+        _updateProductCardAction(p);
       };
       row.querySelector('[data-act="inc"]').onclick = () => {
-        state.cart[p.id]++; openCart(); refreshCartBar(); renderProducts();
+        state.cart[p.id]++;
+        renderCartItems(); refreshCartBar();
+        _updateProductCardAction(p);
       };
       list.appendChild(row);
     }
     $("cartSumTotal").textContent = fmt(cartTotal());
+  }
+
+  function openCart() {
+    openScreen("cartScreen");
+    renderCartItems();
   }
   $("cartBack").onclick = () => closeScreen("cartScreen");
 
@@ -374,6 +409,26 @@
       showErr(T("err_no_init"));
       return;
     }
+    // Building details are required for delivery (not for pickup).
+    if (state.deliveryType === "delivery") {
+      const bldgFields = ["inputEntrance", "inputFloor", "inputApartment", "inputIntercom"];
+      let missing = false;
+      for (const id of bldgFields) {
+        const el = $(id);
+        if (!el || !el.value.trim()) {
+          if (el) el.classList.add("has-error");
+          missing = true;
+        } else if (el) {
+          el.classList.remove("has-error");
+        }
+      }
+      if (missing) {
+        showErr(T("err_bldg"));
+        // Scroll the address card into view so the user sees the highlighted rows.
+        $("addrCard")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      }
+    }
 
     const payload = {
       init_data: initData,
@@ -448,49 +503,85 @@
     }
   };
 
+  function _openPayUrl(url) {
+    if (tg) tg.openLink(url); else window.open(url, "_blank");
+  }
+
+  async function _copyCardNumber(cardNum) {
+    try {
+      await navigator.clipboard.writeText(cardNum.replace(/\s/g, ""));
+      const hint = $("payCopyHint");
+      hint.classList.remove("hidden");
+      setTimeout(() => hint.classList.add("hidden"), 3000);
+    } catch { /* clipboard blocked on some browsers - silent */ }
+  }
+
   function showSuccess(data) {
     $("payOrderId").textContent = "#" + data.order_id;
     $("payAmount").textContent = fmt(data.total);
 
     const isCard = data.payment_method === "card";
+    const cardSection = $("payCardSection");
 
-    // Card number block - show if backend sent one.
-    const cardBlock = $("payCardBlock");
-    if (isCard && data.card_number) {
-      cardBlock.classList.remove("hidden");
-      $("payCardNumber").textContent = data.card_number;
-      $("payCardCopy").onclick = async () => {
-        try {
-          await navigator.clipboard.writeText(data.card_number);
-          $("payCardCopy").textContent = T("copied");
-          setTimeout(() => { $("payCardCopy").textContent = T("copy"); }, 2000);
-        } catch { /* clipboard blocked - silent */ }
-      };
+    if (!isCard) {
+      cardSection.classList.add("hidden");
     } else {
-      cardBlock.classList.add("hidden");
-    }
+      cardSection.classList.remove("hidden");
 
-    const setBtn = (btnId, url, configured, labelOn, labelOff) => {
-      const btn = $(btnId);
-      if (isCard && url) {
-        btn.classList.remove("hidden");
-        btn.textContent = configured ? labelOn : labelOff;
-        btn.onclick = () => { tg ? tg.openLink(url) : window.open(url, "_blank"); };
+      // ── Card number display ──────────────────────────────────────────
+      const cardBlock = $("payCardBlock");
+      if (data.card_number) {
+        cardBlock.classList.remove("hidden");
+        $("payCardNumber").textContent = data.card_number;
+        $("payCardCopy").onclick = () => _copyCardNumber(data.card_number);
       } else {
-        btn.classList.add("hidden");
+        cardBlock.classList.add("hidden");
       }
-    };
-    setBtn("payClickBtn", data.click_url, data.click_configured, T("click_on"), T("click_off"));
-    setBtn("payPaymeBtn", data.payme_url, data.payme_configured, T("payme_on"), T("payme_off"));
-    setBtn("payAlifBtn",  data.alif_url,  data.alif_configured, T("alif_on"),  T("alif_off"));
 
-    const noUrl = $("payNoUrl");
-    const anyConfigured = data.click_configured || data.payme_configured || data.alif_configured;
-    if (isCard && !anyConfigured && !data.card_number) {
-      noUrl.classList.remove("hidden");
-      noUrl.textContent = T("no_pay_configured");
-    } else {
-      noUrl.classList.add("hidden");
+      // ── Payment app buttons ──────────────────────────────────────────
+      // When merchant checkout URL available → one tap to pay (amount pre-filled).
+      // When transfer URL → copy card number first, then open app.
+      const appsBlock = $("payAppsBlock");
+      const configuredApps = [];
+
+      const wireBtn = (btnId, url, mode) => {
+        const btn = $(btnId);
+        if (!btn) return;
+        if (!url) { btn.classList.add("hidden"); return; }
+        btn.classList.remove("hidden");
+        configuredApps.push({ url, mode });
+        btn.onclick = async () => {
+          if (mode === "transfer" && data.card_number) {
+            await _copyCardNumber(data.card_number);
+          }
+          _openPayUrl(url);
+        };
+      };
+
+      wireBtn("payClickBtn", data.click_url, data.click_mode);
+      wireBtn("payPaymeBtn", data.payme_url, data.payme_mode);
+      wireBtn("payAlifBtn",  data.alif_url,  data.alif_mode);
+
+      if (configuredApps.length > 0) {
+        appsBlock.classList.remove("hidden");
+      } else {
+        appsBlock.classList.add("hidden");
+      }
+
+      // No payment options at all → show notice
+      const noUrl = $("payNoUrl");
+      if (configuredApps.length === 0 && !data.card_number) {
+        noUrl.classList.remove("hidden");
+        noUrl.textContent = T("no_pay_configured");
+      } else {
+        noUrl.classList.add("hidden");
+      }
+
+      // Auto-open if only one app is available AND it's a merchant checkout
+      // (merchant checkouts are safe to auto-open — amount+merchant pre-filled).
+      if (configuredApps.length === 1 && configuredApps[0].mode === "merchant") {
+        setTimeout(() => _openPayUrl(configuredApps[0].url), 600);
+      }
     }
 
     state.cart = {};

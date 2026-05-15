@@ -74,10 +74,10 @@
   }
 
   // ----- Tabs ----------------------------------------------------------
-  document.querySelectorAll("#ordTabs .tab").forEach(btn => {
+  document.querySelectorAll("#ordTabs .ao-tab").forEach(btn => {
     btn.onclick = () => {
       state.status = btn.dataset.st;
-      document.querySelectorAll("#ordTabs .tab").forEach(b => b.classList.toggle("active", b === btn));
+      document.querySelectorAll("#ordTabs .ao-tab").forEach(b => b.classList.toggle("active", b === btn));
       load();
     };
   });
@@ -101,11 +101,11 @@
       });
       const data = await api("GET", "/api/admin/orders?" + qs);
       const c = data.counts || {};
-      $("cnt_all").textContent = c.total || 0;
-      $("cnt_pending").textContent = c.pending || 0;
-      $("cnt_confirmed").textContent = c.confirmed || 0;
-      $("cnt_delivered").textContent = c.delivered || 0;
-      $("cnt_cancelled").textContent = c.cancelled || 0;
+      const setCount = (id, val) => { const el = $(id); if (el) el.textContent = val; };
+      setCount("cnt_all",       c.total     || 0);
+      setCount("cnt_confirmed", c.confirmed || 0);
+      setCount("cnt_delivered", c.delivered || 0);
+      setCount("cnt_cancelled", c.cancelled || 0);
       state.all = data.orders || [];
       // Today's count is computed on the client from the full list.
       const t = todayStr();
@@ -135,56 +135,96 @@
       );
     }
     if (!items.length) {
-      list.innerHTML = `<div class="info">${T("empty")}</div>`;
+      list.innerHTML = `<div class="ao-empty"><div class="ao-empty-icon">📋</div>${T("empty")}</div>`;
       return;
     }
     items.forEach(o => list.appendChild(card(o)));
   }
 
+  function statusClass(s) {
+    return { pending: "st-pending", confirmed: "st-confirmed", delivered: "st-delivered", cancelled: "st-cancelled" }[s] || "st-pending";
+  }
+  function stripeClass(s) {
+    return { pending: "stripe-pending", confirmed: "stripe-confirmed", delivered: "stripe-delivered", cancelled: "stripe-cancelled" }[s] || "stripe-pending";
+  }
+
   function card(o) {
-    const c = document.createElement("article");
-    c.className = "ord-card";
-    // Build the items preview from already-parsed items (escape once, inside the map).
+    const el = document.createElement("article");
+    el.className = "ao-card";
+
     const itemsList = (o.items || []).slice(0, 3);
-    const itemsHtml = itemsList.length
-      ? itemsList.map(it => `<span class="ord-item-chip"><span class="chip-name">${escapeHtml(it.name)}</span><span class="chip-qty">×${it.qty}</span></span>`).join("")
-      : `<span class="ord-item-chip"><span class="chip-name">${escapeHtml(o.service || "—")}</span></span>`;
-    const more = (o.items || []).length > 3
-      ? `<span class="ord-item-chip more">+${o.items.length - 3}</span>` : "";
+    const chipsHtml = itemsList.length
+      ? itemsList.map(it =>
+          `<span class="ao-chip"><span>${escapeHtml(it.name)}</span><span class="ao-chip-qty">×${it.qty}</span></span>`
+        ).join("")
+      : `<span class="ao-chip">${escapeHtml(o.service || "—")}</span>`;
+    const moreChip = (o.items || []).length > 3
+      ? `<span class="ao-chip ao-chip-more">+${o.items.length - 3}</span>` : "";
 
-    c.innerHTML = `
-      <div class="ord-head">
-        <div class="ord-head-left">
-          <div class="ord-id">#${o.id}</div>
-          <div class="ord-date">📅 ${escapeHtml(fmtDate(o.created_at))}</div>
+    const quickBtns = o.status === "pending"
+      ? `<div class="ao-quick-actions">
+           <button class="ao-qa-btn ao-qa-confirm qa-confirm">${T("act_confirm")}</button>
+           <button class="ao-qa-btn ao-qa-cancel qa-cancel">${T("act_cancel")}</button>
+         </div>`
+      : o.status === "confirmed"
+      ? `<div class="ao-quick-actions">
+           <button class="ao-qa-btn ao-qa-deliver qa-deliver">${T("act_delivered")}</button>
+           <button class="ao-qa-btn ao-qa-cancel qa-cancel">${T("act_cancel")}</button>
+         </div>`
+      : "";
+
+    el.innerHTML = `
+      <div class="ao-card-stripe ${stripeClass(o.status)}"></div>
+      <div class="ao-card-inner">
+        <div class="ao-card-head">
+          <div>
+            <div class="ao-card-id-wrap">
+              <span class="ao-card-id">#${o.id}</span>
+              <span class="ao-card-date">${escapeHtml(fmtDate(o.created_at))}</span>
+            </div>
+          </div>
+          <span class="ao-status ${statusClass(o.status)}">${T("status_" + o.status, o.status)}</span>
         </div>
-        ${statusBadge(o.status)}
-      </div>
 
-      <div class="ord-user-line">
-        <span class="ord-name">${escapeHtml(o.full_name || ("id" + o.user_id))}</span>
-        ${userTag(o)}
-      </div>
-
-      <div class="ord-contact">
-        ${o.phone ? `<a href="tel:${escapeHtml(o.phone)}" class="ord-phone">📞 ${escapeHtml(o.phone)}</a>` : ""}
-        ${payBadge(o.payment_method)}
-      </div>
-
-      <div class="ord-addr-row">📍 ${escapeHtml(o.address || "—")}</div>
-
-      <div class="ord-chips">${itemsHtml}${more}</div>
-
-      <div class="ord-foot">
-        <div class="ord-total-wrap">
-          <span class="ord-total-lbl">${T("lbl_total")}</span>
-          <strong class="ord-total">${fmt(o.amount)}</strong>
+        <div class="ao-card-user">
+          <span class="ao-card-name">${escapeHtml(o.full_name || "id" + o.user_id)}</span>
+          ${o.username ? `<span class="ao-card-uname">@${escapeHtml(o.username)}</span>` : ""}
+          ${o.phone ? `<a href="tel:${escapeHtml(o.phone)}" class="ao-card-phone">📞 ${escapeHtml(o.phone)}</a>` : ""}
         </div>
-        <button class="primary-btn ord-open">${T("view_details")}</button>
+
+        ${o.address ? `<div class="ao-card-addr">📍 ${escapeHtml(o.address)}</div>` : ""}
+
+        <div class="ao-chips">${chipsHtml}${moreChip}</div>
+
+        <div class="ao-card-foot">
+          <strong class="ao-card-total">${fmt(o.amount)}</strong>
+          <span class="ao-pay-badge">${o.payment_method === "card" ? T("pay_card") : T("pay_cash")}</span>
+          <button class="ao-open-btn">${T("view_details")}</button>
+        </div>
+
+        ${quickBtns}
       </div>
     `;
-    c.querySelector(".ord-open").onclick = () => openDetail(o.id);
-    return c;
+
+    el.querySelector(".ao-open-btn").onclick = (e) => { e.stopPropagation(); openDetail(o.id); };
+    const wireQuick = (cls, status, confirmKey) => {
+      const btn = el.querySelector(cls);
+      if (!btn) return;
+      btn.onclick = async (e) => {
+        e.stopPropagation();
+        if (confirmKey && !confirm(tfmt(confirmKey, { id: o.id }))) return;
+        btn.disabled = true;
+        try {
+          await api("POST", "/api/admin/orders/status", { order_id: o.id, status });
+          if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
+          await load();
+        } catch (err) { alert("⚠️ " + err.message); btn.disabled = false; }
+      };
+    };
+    wireQuick(".qa-confirm", "confirmed");
+    wireQuick(".qa-deliver", "delivered");
+    wireQuick(".qa-cancel",  "cancelled", "confirm_cancel");
+    return el;
   }
 
   function todayStr() {
@@ -215,78 +255,90 @@
 
   function renderDetail(o) {
     const itemsHtml = (o.items || []).map(it =>
-      `<div class="ord-item-row"><span>${escapeHtml(it.name)}</span><span class="muted">${tfmt("x_qty", { q: it.qty })}</span><strong>${fmt(it.price * it.qty)}</strong></div>`
-    ).join("");
-    const discountRow = o.discount > 0
-      ? `<div class="ord-row"><span>${T("lbl_discount")}${o.promo_code ? " · " + escapeHtml(o.promo_code) : ""}</span><strong style="color:var(--success)">− ${fmt(o.discount)}</strong></div>`
-      : "";
-    const usernameLine = o.username
-      ? `<a class="fb-uname" href="https://t.me/${escapeHtml(o.username)}" target="_blank">@${escapeHtml(o.username)}</a>`
+      `<div class="ao-item-row">
+         <span class="ao-item-name">${escapeHtml(it.name)}</span>
+         <span class="ao-item-qty">${tfmt("x_qty", { q: it.qty })}</span>
+         <span class="ao-item-price">${fmt(it.price * it.qty)}</span>
+       </div>`
+    ).join("") || `<div class="ao-detail-row"><span class="ao-detail-val">${escapeHtml(o.service || "—")}</span></div>`;
+
+    const row = (key, val) => val
+      ? `<div class="ao-detail-row"><span class="ao-detail-key">${T(key)}</span><span class="ao-detail-val">${val}</span></div>`
       : "";
 
-    let actions = "";
+    let actionsHtml = "";
     if (o.status === "pending") {
-      actions = `
+      actionsHtml = `
         <button class="primary-btn act-confirm">${T("act_confirm")}</button>
-        <button class="ghost-btn act-cancel" style="border-color:var(--danger);color:var(--danger)">${T("act_cancel")}</button>
-      `;
+        <button class="ghost-btn act-cancel" style="border-color:var(--danger);color:var(--danger)">${T("act_cancel")}</button>`;
     } else if (o.status === "confirmed") {
-      actions = `
+      actionsHtml = `
         <button class="primary-btn act-delivered">${T("act_delivered")}</button>
-        <button class="ghost-btn act-cancel" style="border-color:var(--danger);color:var(--danger)">${T("act_cancel")}</button>
-      `;
+        <button class="ghost-btn act-cancel" style="border-color:var(--danger);color:var(--danger)">${T("act_cancel")}</button>`;
     }
 
+    const bldg = [
+      o.entrance  ? `Podyez: ${escapeHtml(o.entrance)}`  : "",
+      o.floor     ? `Qavat: ${escapeHtml(o.floor)}`      : "",
+      o.apartment ? `Xon.: ${escapeHtml(o.apartment)}`   : "",
+      o.intercom  ? `Domofon: ${escapeHtml(o.intercom)}` : "",
+    ].filter(Boolean).join(" · ");
+
     $("detailBody").innerHTML = `
-      <div class="ord-detail-block">
-        <div class="ord-row ord-status-line">${statusBadge(o.status)} <span class="muted">${T("lbl_placed")}: ${escapeHtml(fmtDate(o.created_at))}</span></div>
+      <!-- Status banner -->
+      <div class="ao-detail-section">
+        <div class="ao-detail-row" style="align-items:center">
+          <span class="ao-status ${statusClass(o.status)}" style="padding:5px 12px;font-size:13px">${T("status_" + o.status, o.status)}</span>
+          <span style="color:var(--text-muted);font-size:12px;margin-left:auto">${escapeHtml(fmtDate(o.created_at))}</span>
+        </div>
       </div>
 
-      <section class="dash-section">
-        <h3>${T("lbl_customer")}</h3>
-        <div class="ord-detail-block">
-          <div class="ord-row">👤 ${escapeHtml(o.full_name || "id" + o.user_id)} ${usernameLine}</div>
-          <div class="ord-row">📞 <a href="tel:${escapeHtml(o.phone)}" class="fb-phone">${escapeHtml(o.phone || "—")}</a></div>
+      <!-- Customer -->
+      <div class="ao-detail-section">
+        <div class="ao-detail-section-head">👤 ${T("lbl_customer")}</div>
+        ${row("lbl_customer", escapeHtml(o.full_name || "id" + o.user_id) + (o.username ? ` <a class="fb-uname" href="https://t.me/${escapeHtml(o.username)}" target="_blank">@${escapeHtml(o.username)}</a>` : ""))}
+        <div class="ao-detail-row">
+          <span class="ao-detail-key">${T("lbl_phone")}</span>
+          <span class="ao-detail-val"><a href="tel:${escapeHtml(o.phone)}" class="ao-card-phone">${escapeHtml(o.phone || "—")}</a></span>
         </div>
-      </section>
+      </div>
 
-      <section class="dash-section">
-        <h3>${T("lbl_items")}</h3>
-        <div class="ord-items-list">${itemsHtml || `<div class="info">${escapeHtml(o.service || "—")}</div>`}</div>
-        <div class="ord-row" style="margin-top:8px">
+      <!-- Items -->
+      <div class="ao-items-section">
+        <div class="ao-detail-section-head">${T("lbl_items")}</div>
+        ${itemsHtml}
+        ${o.discount > 0 ? `
+          <div class="ao-item-row" style="border-top:1px solid var(--line)">
+            <span class="ao-item-name" style="color:var(--text-muted)">${T("lbl_discount")}${o.promo_code ? " · " + escapeHtml(o.promo_code) : ""}</span>
+            <span class="ao-item-price" style="color:var(--success)">− ${fmt(o.discount)}</span>
+          </div>` : ""}
+        <div class="ao-total-row">
           <span>${T("lbl_total")}</span>
-          <strong style="color:var(--brand)">${fmt(o.amount)}</strong>
+          <strong>${fmt(o.amount)}</strong>
         </div>
-        ${discountRow}
-        <div class="ord-row"><span>${T("lbl_payment")}</span> ${payBadge(o.payment_method)}</div>
-      </section>
+      </div>
 
-      <section class="dash-section">
-        <h3>📍 ${T("lbl_address")} / ${T("lbl_branch")}</h3>
-        <div class="ord-detail-block">
-          <div class="ord-row">${T("lbl_branch")}: <strong>${escapeHtml(o.branch || "—")}</strong></div>
-          <div class="ord-row">${T("lbl_address")}: <strong>${escapeHtml(o.address || "—")}</strong></div>
-          ${o.entrance || o.floor || o.apartment || o.intercom ? `
-            <div class="ord-row ord-bldg">
-              🏠 ${o.entrance  ? `<span>Podyez: <strong>${escapeHtml(o.entrance)}</strong></span>`  : ""}
-                  ${o.floor     ? `<span>Qavat: <strong>${escapeHtml(o.floor)}</strong></span>`     : ""}
-                  ${o.apartment ? `<span>Xon.: <strong>${escapeHtml(o.apartment)}</strong></span>`  : ""}
-                  ${o.intercom  ? `<span>Domofon: <strong>${escapeHtml(o.intercom)}</strong></span>` : ""}
-            </div>` : ""}
-          <div class="ord-row">${T("lbl_time")}: <strong>${escapeHtml(o.preferred_time || "—")}</strong></div>
+      <!-- Delivery & Payment -->
+      <div class="ao-detail-section">
+        <div class="ao-detail-section-head">🚚 ${T("lbl_delivery")} / 💳 ${T("lbl_payment")}</div>
+        ${row("lbl_branch",  escapeHtml(o.branch || "—"))}
+        ${row("lbl_address", escapeHtml(o.address || "—"))}
+        ${bldg ? `<div class="ao-detail-row"><span class="ao-detail-key">🏠</span><span class="ao-detail-val" style="color:var(--text-muted)">${bldg}</span></div>` : ""}
+        ${row("lbl_time",    escapeHtml(o.preferred_time || "—"))}
+        <div class="ao-detail-row">
+          <span class="ao-detail-key">${T("lbl_payment")}</span>
+          <span class="ao-detail-val">${o.payment_method === "card" ? T("pay_card") : T("pay_cash")}</span>
         </div>
-      </section>
+      </div>
 
       ${o.courier_note || o.note ? `
-        <section class="dash-section">
-          <h3>💬 Eslatmalar</h3>
-          <div class="ord-detail-block">
-            ${o.courier_note ? `<div class="ord-note"><span class="ord-note-tag">🚗 Kuryerga</span><div>${escapeHtml(o.courier_note)}</div></div>` : ""}
-            ${o.note         ? `<div class="ord-note"><span class="ord-note-tag">🍴 Restoranga</span><div>${escapeHtml(o.note)}</div></div>` : ""}
-          </div>
-        </section>` : ""}
+        <div class="ao-detail-section">
+          <div class="ao-detail-section-head">💬 Eslatmalar</div>
+          ${o.courier_note ? `<div class="ao-detail-row"><span class="ao-detail-key">${T("lbl_note_courier")}</span><span class="ao-detail-val">${escapeHtml(o.courier_note)}</span></div>` : ""}
+          ${o.note         ? `<div class="ao-detail-row"><span class="ao-detail-key">${T("lbl_note_rest")}</span><span class="ao-detail-val">${escapeHtml(o.note)}</span></div>` : ""}
+        </div>` : ""}
 
-      ${actions ? `<div class="ord-actions">${actions}</div>` : ""}
+      ${actionsHtml ? `<div class="ao-detail-actions">${actionsHtml}</div>` : ""}
     `;
 
     const setAct = (cls, status, confirmKey) => {
@@ -296,20 +348,15 @@
         if (confirmKey && !confirm(tfmt(confirmKey, { id: o.id }))) return;
         btn.disabled = true;
         try {
-          await api("POST", "/api/admin/orders/status", {
-            order_id: o.id, status,
-          });
+          await api("POST", "/api/admin/orders/status", { order_id: o.id, status });
           if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
           await load();
-          // Reflect the new status in the open detail.
           const fresh = state.all.find(x => x.id === o.id);
           if (fresh) renderDetail(fresh);
         } catch (e) {
-          $("detailErr").textContent = "⚠️ " + e.message;
-          $("detailErr").classList.remove("hidden");
-        } finally {
-          btn.disabled = false;
-        }
+          const errEl = $("detailErr");
+          if (errEl) { errEl.textContent = "⚠️ " + e.message; errEl.classList.remove("hidden"); }
+        } finally { btn.disabled = false; }
       };
     };
     setAct(".act-confirm",   "confirmed");

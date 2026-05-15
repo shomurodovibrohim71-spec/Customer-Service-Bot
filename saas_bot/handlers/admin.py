@@ -159,13 +159,15 @@ async def order_action_callback(update: Update, context: ContextTypes.DEFAULT_TY
         order_id = int(raw_id)
     except ValueError:
         return
-    new_status = "confirmed" if action == "adm_confirm" else "cancelled"
+    STATUS_MAP = {"adm_confirm": "confirmed", "adm_cancel": "cancelled", "adm_delivered": "delivered"}
+    new_status = STATUS_MAP.get(action, "cancelled")
     await db.set_order_status(order_id, new_status)
     order = await db.get_order(order_id)
     if order is None:
         await query.edit_message_text(f"❌ Buyurtma #{order_id} topilmadi.")
         return
-    emoji_suffix = "✅ TASDIQLANDI" if new_status == "confirmed" else "❌ BEKOR QILINDI"
+    status_labels = {"confirmed": "✅ TASDIQLANDI", "cancelled": "❌ BEKOR QILINDI", "delivered": "🚀 YETKAZILDI"}
+    emoji_suffix = status_labels.get(new_status, new_status.upper())
     await query.edit_message_text(
         f"{emoji_suffix} #{order_id}\n\n"
         f"👤 {order['full_name']}\n📞 {order['phone']}\n"
@@ -198,6 +200,13 @@ async def order_action_callback(update: Update, context: ContextTypes.DEFAULT_TY
                     f"🍔 {service}\n📍 {addr}\n🕐 {ptime}\n"
                     f"💰 Summa: {amount:,} so'm\n\nTez orada bog'lanamiz 🚗"
                 )
+        elif new_status == "delivered":
+            if cust_lang == "ru":
+                customer_text = f"🚀 *Ваш заказ #{order_id} доставлен!*\n\nСпасибо за заказ! 🙏"
+            elif cust_lang == "en":
+                customer_text = f"🚀 *Your order #{order_id} has been delivered!*\n\nThank you! 🙏"
+            else:
+                customer_text = f"🚀 *Buyurtmangiz #{order_id} yetkazildi!*\n\nRahmat! 🙏"
         else:
             if cust_lang == "ru":
                 customer_text = (
@@ -228,5 +237,5 @@ def register(app: Application) -> None:
     app.add_handler(CommandHandler("stats", stats_command))
     app.add_handler(CommandHandler("orders", orders_command))
     app.add_handler(
-        CallbackQueryHandler(order_action_callback, pattern=r"^adm_(confirm|cancel):\d+$")
+        CallbackQueryHandler(order_action_callback, pattern=r"^adm_(confirm|cancel|delivered):\d+$")
     )

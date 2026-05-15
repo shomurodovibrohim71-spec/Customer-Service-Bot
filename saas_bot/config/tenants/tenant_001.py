@@ -270,6 +270,15 @@ TEXTS = {
         "show_all_branches":     "🔽 Boshqa filiallarni ko'rish",
         "delivery_auto_branch":  "🏪 Sizga yaqin filial avtomatik tanlandi:\n*{branch}* ({dist:.1f} km)",
         "delivery_no_branch":    "🏪 Filial: avtomatik tanlanadi",
+        # Common button labels
+        "btn_back":              "⬅ Orqaga",
+        "btn_cancel":            "❌ Bekor qilish",
+        "btn_yes":               "✅ Ha",
+        "btn_no":                "❌ Yo'q",
+        "btn_add_to_cart":       "➕ Qo'shish",
+        "btn_confirm_order":     "✅ Tasdiqlash",
+        "time_asap":             "⚡ Hoziroq",
+        "time_asap_value":       "Imkon qadar tez",
     },
     "en": {
         'lang_prompt': '🌐 Choose language / Tilni tanlang / Выберите язык',
@@ -345,12 +354,15 @@ TEXTS = {
         'show_all_branches': '🔽 Show other branches',
         'delivery_auto_branch': '🏪 Nearest branch auto-selected:\n*{branch}* ({dist:.1f} km)',
         'delivery_no_branch': '🏪 Branch: auto-selected',
-        'pickup_nearest_header': '🏪 *Ближайшие к вам филиалы:*',
-        'pickup_no_coords': '🏪 Выберите филиал:',
-        'branch_distance_btn': '{name} — {dist:.1f} км',
-        'show_all_branches': '🔽 Показать другие филиалы',
-        'delivery_auto_branch': '🏪 Ближайший филиал выбран автоматически:\n*{branch}* ({dist:.1f} км)',
-        'delivery_no_branch': '🏪 Филиал: автоматически',
+        # Common button labels
+        'btn_back':          '⬅ Back',
+        'btn_cancel':        '❌ Cancel',
+        'btn_yes':           '✅ Yes',
+        'btn_no':            '❌ No',
+        'btn_add_to_cart':   '➕ Add',
+        'btn_confirm_order': '✅ Confirm order',
+        'time_asap':         '⚡ ASAP',
+        'time_asap_value':   'As soon as possible',
     },
         "ru": {
         "lang_prompt":       "Botni tilni tanlang\n-----\nВыберите язык бота.",
@@ -471,6 +483,15 @@ TEXTS = {
         'show_all_branches': '🔽 Показать другие филиалы',
         'delivery_auto_branch': '🏪 Ближайший филиал выбран автоматически:\n*{branch}* ({dist:.1f} км)',
         'delivery_no_branch': '🏪 Филиал: автоматически',
+        # Common button labels
+        "btn_back":          "⬅ Назад",
+        "btn_cancel":        "❌ Отменить",
+        "btn_yes":           "✅ Да",
+        "btn_no":            "❌ Нет",
+        "btn_add_to_cart":   "➕ Добавить",
+        "btn_confirm_order": "✅ Подтвердить заказ",
+        "time_asap":         "⚡ Как можно скорее",
+        "time_asap_value":   "Как можно скорее",
     },
 }
 

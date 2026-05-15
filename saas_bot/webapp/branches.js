@@ -60,7 +60,8 @@
     const card = document.createElement("article");
     card.className = "branch-card";
 
-    const open = isOpenNow(b.hours);
+    // is_open=0 → admin forced closed; is_open=1 → use hours schedule
+    const open = (b.is_open === 0) ? false : isOpenNow(b.hours);
     const badge = open === null ? ""
       : open
         ? `<span class="branch-badge">${T("open_now")}</span>`

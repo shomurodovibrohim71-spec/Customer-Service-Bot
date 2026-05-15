@@ -171,6 +171,11 @@ async def webapp_admin_orders() -> FileResponse:
     return FileResponse(str(index))
 
 
+@app.get("/webapp/admin/branches")
+async def webapp_admin_branches() -> FileResponse:
+    return _webapp_file("admin-branches.html")
+
+
 def _check_admin(tenant: Tenant, init_data: str, fallback_uid: int | None) -> int:
     """Resolve current user_id from either initData (preferred) or URL uid fallback,
     then verify they are an admin for this tenant. Returns the user_id or raises 401/403."""
@@ -317,6 +322,120 @@ async def api_admin_category_delete(payload: AdminCategoryIn) -> dict[str, Any]:
     return {"ok": True, "deleted": len(prods)}
 
 
+class AdminBranchToggle(BaseModel):
+    init_data: str = ""
+    fallback_uid: int | None = None
+    tenant_id: str
+    branch_id: int
+    is_open: bool
+
+
+class AdminBranchCreate(BaseModel):
+    init_data: str = ""
+    fallback_uid: int | None = None
+    tenant_id: str
+    name: str
+    address: str
+    phone: str = ""
+    lat: float | None = None
+    lon: float | None = None
+    maps_url: str = ""
+    hours_json: str = ""
+
+
+class AdminBranchUpdate(BaseModel):
+    init_data: str = ""
+    fallback_uid: int | None = None
+    tenant_id: str
+    branch_id: int
+    name: str
+    address: str
+    phone: str = ""
+    lat: float | None = None
+    lon: float | None = None
+    maps_url: str = ""
+    hours_json: str = ""
+
+
+class AdminBranchDelete(BaseModel):
+    init_data: str = ""
+    fallback_uid: int | None = None
+    tenant_id: str
+    branch_id: int
+
+
+@app.get("/api/admin/branches")
+async def api_admin_branches(
+    tenant: str, init_data: str = "", uid: int | None = None,
+) -> dict[str, Any]:
+    """Admin read: all active branches with is_open status."""
+    import json as _json
+    t = get_tenant(tenant)
+    _check_admin(t, init_data, uid)
+    db = get_db(tenant)
+    rows = await db.list_branches()
+    branches = []
+    for b in rows:
+        hours: Any = b.get("hours_json") or {}
+        if isinstance(hours, str):
+            try:
+                hours = _json.loads(hours)
+            except (_json.JSONDecodeError, ValueError):
+                hours = {}
+        branches.append({
+            "id": b["id"], "name": b["name"], "address": b.get("address", ""),
+            "phone": b.get("phone", ""), "maps_url": b.get("maps_url", ""),
+            "lat": b.get("lat"), "lon": b.get("lon"),
+            "hours": hours, "is_open": b.get("is_open", 1),
+        })
+    return {"branches": branches}
+
+
+@app.post("/api/admin/branches/toggle-open")
+async def api_admin_branches_toggle(payload: AdminBranchToggle) -> dict[str, Any]:
+    """Toggle the manual open/closed override for a branch."""
+    t = get_tenant(payload.tenant_id)
+    _check_admin(t, payload.init_data, payload.fallback_uid)
+    db = get_db(payload.tenant_id)
+    ok = await db.set_branch_open(payload.branch_id, payload.is_open)
+    return {"ok": ok, "branch_id": payload.branch_id, "is_open": payload.is_open}
+
+
+@app.post("/api/admin/branches/add")
+async def api_admin_branches_add(payload: AdminBranchCreate) -> dict[str, Any]:
+    t = get_tenant(payload.tenant_id)
+    _check_admin(t, payload.init_data, payload.fallback_uid)
+    db = get_db(payload.tenant_id)
+    bid = await db.add_branch(
+        name=payload.name, address=payload.address, phone=payload.phone,
+        lat=payload.lat, lon=payload.lon, maps_url=payload.maps_url,
+        hours_json=payload.hours_json,
+    )
+    return {"ok": True, "branch_id": bid}
+
+
+@app.post("/api/admin/branches/update")
+async def api_admin_branches_update(payload: AdminBranchUpdate) -> dict[str, Any]:
+    t = get_tenant(payload.tenant_id)
+    _check_admin(t, payload.init_data, payload.fallback_uid)
+    db = get_db(payload.tenant_id)
+    ok = await db.update_branch(
+        branch_id=payload.branch_id, name=payload.name, address=payload.address,
+        phone=payload.phone, lat=payload.lat, lon=payload.lon,
+        maps_url=payload.maps_url, hours_json=payload.hours_json,
+    )
+    return {"ok": ok}
+
+
+@app.post("/api/admin/branches/delete")
+async def api_admin_branches_delete(payload: AdminBranchDelete) -> dict[str, Any]:
+    t = get_tenant(payload.tenant_id)
+    _check_admin(t, payload.init_data, payload.fallback_uid)
+    db = get_db(payload.tenant_id)
+    ok = await db.delete_branch(payload.branch_id)
+    return {"ok": ok}
+
+
 @app.get("/api/branches")
 async def api_branches(tenant_id: str = Query(..., alias="tenant")) -> dict[str, Any]:
     """Public read-only: full branch info incl. hours, phone, maps URL."""
@@ -335,6 +454,7 @@ async def api_branches(tenant_id: str = Query(..., alias="tenant")) -> dict[str,
             "id": b["id"], "name": b["name"], "address": b.get("address", ""),
             "phone": b.get("phone", ""), "lat": b.get("lat"), "lon": b.get("lon"),
             "maps_url": b.get("maps_url", ""), "hours": hours,
+            "is_open": b.get("is_open", 1),
         })
     return {"tenant_id": tenant_id, "branches": branches}
 
@@ -1063,9 +1183,10 @@ async def api_admin_stats(
 def _build_payment_urls(db_settings: dict[str, str], order_id: int, amount_uzs: int) -> dict[str, Any]:
     """Build Click + Payme + Alif universal links and the card-number string.
 
-    Universal links (https://...) auto-open the bank app on mobile if installed,
-    otherwise fall through to the website. With merchant credentials we generate
-    a fully prefilled checkout URL; without them we use a generic app URL.
+    Priority:
+    1. Merchant credentials → fully prefilled checkout URL (click_mode / payme_mode = "merchant")
+    2. Card number only → card-to-card transfer URL        (mode = "transfer")
+    3. Nothing           → empty string, button hidden     (mode = "none")
     """
     import base64
     click_merchant = db_settings.get("company.click_merchant_id", "").strip()
@@ -1073,18 +1194,32 @@ def _build_payment_urls(db_settings: dict[str, str], order_id: int, amount_uzs: 
     payme_merchant = db_settings.get("company.payme_merchant_id", "").strip()
     alif_phone     = db_settings.get("company.alif_phone", "").strip()
     card_number    = db_settings.get("company.card_number", "").strip()
+    card_digits    = ''.join(ch for ch in card_number if ch.isdigit())
 
     # --- Click ---------------------------------------------------------
     if click_merchant and click_service:
+        # Merchant checkout — amount and order ID are pre-filled; opens
+        # the Click payment page directly (no card number input needed).
         click_url = (
             "https://my.click.uz/services/pay"
             f"?service_id={click_service}&merchant_id={click_merchant}"
             f"&amount={amount_uzs}&transaction_param={order_id}"
         )
         click_configured = True
+        click_mode = "merchant"
+    elif card_digits:
+        # Card-to-card transfer: opens Click app/web with the recipient
+        # card number pre-filled.  Amount is passed as a hint — some
+        # versions of the Click app honour it, others ignore it.
+        click_url = (
+            f"https://my.click.uz/pay/?cardNumber={card_digits}&amount={amount_uzs}"
+        )
+        click_configured = True
+        click_mode = "transfer"
     else:
-        click_url = "https://my.click.uz/"
+        click_url = ""
         click_configured = False
+        click_mode = "none"
 
     # --- Payme ---------------------------------------------------------
     if payme_merchant:
@@ -1093,28 +1228,32 @@ def _build_payment_urls(db_settings: dict[str, str], order_id: int, amount_uzs: 
         encoded = base64.b64encode(raw.encode()).decode()
         payme_url = f"https://checkout.paycom.uz/{encoded}"
         payme_configured = True
+        payme_mode = "merchant"
+    elif card_digits:
+        # Payme P2P transfer link — opens Payme with recipient card pre-filled.
+        payme_url = f"https://payme.uz/transfer?cardNumber={card_digits}&amount={amount_uzs}"
+        payme_configured = True
+        payme_mode = "transfer"
     else:
-        payme_url = "https://payme.uz/"
+        payme_url = ""
         payme_configured = False
+        payme_mode = "none"
 
     # --- Alif Mobile ---------------------------------------------------
-    # Alif has no documented public deep-link for "send to phone" yet. We use
-    # https://alif.uz (universal link to the bank's site / app banner). On
-    # phones with Alif Mobile installed the OS will offer to open the app.
     if alif_phone:
         digits = ''.join(ch for ch in alif_phone if ch.isdigit())
-        # The Alif Mobile bot accepts /start payload with phone+amount; use it
-        # as a sane "open Alif and pay" entry point.
         alif_url = f"https://t.me/alifmobile_bot?start=pay_{digits}_{amount_uzs}"
         alif_configured = True
+        alif_mode = "transfer"
     else:
-        alif_url = "https://alif.uz/"
+        alif_url = ""
         alif_configured = False
+        alif_mode = "none"
 
     return {
-        "click_url": click_url, "click_configured": click_configured,
-        "payme_url": payme_url, "payme_configured": payme_configured,
-        "alif_url":  alif_url,  "alif_configured":  alif_configured,
+        "click_url": click_url, "click_configured": click_configured, "click_mode": click_mode,
+        "payme_url": payme_url, "payme_configured": payme_configured, "payme_mode": payme_mode,
+        "alif_url":  alif_url,  "alif_configured":  alif_configured,  "alif_mode":  alif_mode,
         "card_number": card_number,
     }
 
@@ -1289,13 +1428,16 @@ async def api_order(payload: OrderIn) -> dict[str, Any]:
         "ok": True, "order_id": order_id, "total": total,
         "subtotal": subtotal, "discount": discount, "promo_code": applied_code,
         "payment_method": payment_method,
-        "click_url": pay_urls.get("click_url", ""),
-        "payme_url": pay_urls.get("payme_url", ""),
-        "alif_url":  pay_urls.get("alif_url", ""),
+        "click_url":        pay_urls.get("click_url", ""),
+        "payme_url":        pay_urls.get("payme_url", ""),
+        "alif_url":         pay_urls.get("alif_url", ""),
         "click_configured": pay_urls.get("click_configured", False),
         "payme_configured": pay_urls.get("payme_configured", False),
         "alif_configured":  pay_urls.get("alif_configured", False),
-        "card_number": pay_urls.get("card_number", ""),
+        "click_mode":       pay_urls.get("click_mode", "none"),
+        "payme_mode":       pay_urls.get("payme_mode", "none"),
+        "alif_mode":        pay_urls.get("alif_mode", "none"),
+        "card_number":      pay_urls.get("card_number", ""),
     }
 
 

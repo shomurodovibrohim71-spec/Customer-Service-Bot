@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0f1115">
+  <title>Filiallar</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="/static/styles.css">
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      background: var(--bg);
+      padding-bottom: calc(80px + env(safe-area-inset-bottom));
+      min-height: 100vh;
+    }
+
+    /* ── Topbar ── */
+    .topbar {
+      position: sticky; top: 0; z-index: 20;
+      background: rgba(15,17,21,.94);
+      backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--line);
+      padding: 14px 16px 12px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .topbar-title { font-size: 20px; font-weight: 800; letter-spacing: -.02em; }
+    .topbar-sub   { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+
+    /* ── Branch list ── */
+    .branch-list { padding: 14px 14px 0; display: flex; flex-direction: column; gap: 12px; }
+
+    /* ── Branch card ── */
+    .bc {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      overflow: hidden;
+      transition: border-color .2s;
+    }
+    .bc.is-open   { border-color: rgba(52,199,89,.35); }
+    .bc.is-closed { border-color: rgba(255,59,48,.35); }
+
+    .bc-stripe { height: 3px; }
+    .bc.is-open   .bc-stripe { background: #34c759; }
+    .bc.is-closed .bc-stripe { background: #ff3b30; }
+
+    .bc-body { padding: 13px 14px 11px; }
+
+    .bc-header { display: flex; align-items: flex-start; gap: 10px; }
+    .bc-info   { flex: 1; min-width: 0; }
+    .bc-name   { font-size: 15px; font-weight: 700; line-height: 1.3; }
+    .bc-addr   { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+    .bc-phone  { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+    .bc-right  { display: flex; flex-direction: column; align-items: flex-end; gap: 7px; flex-shrink: 0; }
+
+    .bc-badge {
+      font-size: 11px; font-weight: 700;
+      padding: 3px 9px; border-radius: 10px; white-space: nowrap;
+    }
+    .bc-badge.open   { background: rgba(52,199,89,.15); color: #34c759; }
+    .bc-badge.closed { background: rgba(255,59,48,.15); color: #ff3b30; }
+
+    /* Toggle switch */
+    .tsw { position: relative; width: 46px; height: 26px; cursor: pointer; flex-shrink: 0; }
+    .tsw input { opacity: 0; width: 0; height: 0; position: absolute; }
+    .tsw-track {
+      position: absolute; inset: 0; border-radius: 13px;
+      background: var(--bg-soft); border: 1px solid var(--line);
+      transition: background .22s, border-color .22s;
+    }
+    .tsw input:checked ~ .tsw-track { background: #34c759; border-color: #34c759; }
+    .tsw-thumb {
+      position: absolute; top: 3px; left: 3px;
+      width: 20px; height: 20px; border-radius: 50%;
+      background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.4);
+      transition: transform .22s cubic-bezier(.34,1.56,.64,1);
+    }
+    .tsw input:checked ~ .tsw-thumb { transform: translateX(20px); }
+
+    /* Actions row */
+    .bc-actions {
+      display: flex; gap: 8px;
+      margin-top: 11px; padding-top: 11px; border-top: 1px solid var(--line);
+    }
+    .bc-btn {
+      flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px;
+      padding: 9px 6px; border-radius: 10px;
+      border: 1px solid var(--line); background: var(--bg-soft);
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+    }
+    .bc-btn.edit { color: var(--brand); }
+    .bc-btn.del  { color: #ff3b30; border-color: rgba(255,59,48,.25); }
+
+    /* ── FAB ── */
+    .fab {
+      position: fixed;
+      right: calc(18px + env(safe-area-inset-right));
+      bottom: calc(22px + env(safe-area-inset-bottom));
+      width: 56px; height: 56px; border-radius: 28px;
+      background: var(--brand); color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 30px; line-height: 1; font-weight: 300;
+      border: none; cursor: pointer;
+      box-shadow: 0 6px 20px rgba(0,0,0,.45);
+      touch-action: manipulation; z-index: 30;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* ── Sheet overlay ── */
+    .sheet-overlay {
+      position: fixed; inset: 0; z-index: 50;
+      background: rgba(0,0,0,.55); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+      display: flex; align-items: flex-end;
+      opacity: 0; pointer-events: none;
+      transition: opacity .25s;
+    }
+    .sheet-overlay.active { opacity: 1; pointer-events: all; }
+
+    .sheet {
+      width: 100%; max-height: 94dvh; overflow-y: auto;
+      background: var(--surface);
+      border-radius: 22px 22px 0 0;
+      padding-bottom: calc(24px + env(safe-area-inset-bottom));
+      transform: translateY(100%);
+      transition: transform .3s cubic-bezier(.32,0,.67,0);
+    }
+    .sheet-overlay.active .sheet {
+      transform: translateY(0);
+      transition-timing-function: cubic-bezier(.33,1,.68,1);
+    }
+
+    .sheet-handle {
+      width: 36px; height: 4px; background: var(--line);
+      border-radius: 2px; margin: 12px auto 0;
+    }
+    .sheet-hdr {
+      padding: 14px 18px 12px;
+      border-bottom: 1px solid var(--line);
+      font-size: 17px; font-weight: 800;
+    }
+
+    /* Form fields */
+    .fg { padding: 13px 18px 0; }
+    .fg-label {
+      font-size: 11px; font-weight: 700; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: .05em; margin-bottom: 6px;
+    }
+    .fg-input {
+      width: 100%; background: var(--bg);
+      border: 1px solid var(--line); border-radius: 12px;
+      padding: 11px 13px; font-size: 15px; color: var(--text);
+      font-family: inherit; appearance: none;
+    }
+    .fg-input:focus { outline: none; border-color: var(--brand); }
+
+    /* Hours grid */
+    .hours-wrap { padding: 13px 18px 0; }
+    .hours-lbl {
+      font-size: 11px; font-weight: 700; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px;
+    }
+    .day-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 0; border-bottom: 1px solid var(--line);
+    }
+    .day-row:last-child { border-bottom: none; }
+    .day-lbl { width: 96px; font-size: 13px; font-weight: 600; flex-shrink: 0; }
+    .day-chk { width: 18px; height: 18px; accent-color: var(--brand); cursor: pointer; flex-shrink: 0; }
+    .day-time {
+      flex: 1; background: var(--bg); border: 1px solid var(--line);
+      border-radius: 9px; padding: 7px 10px; font-size: 13px;
+      color: var(--text); font-family: inherit;
+    }
+    .day-time:disabled { opacity: .35; }
+    .day-time:focus { outline: none; border-color: var(--brand); }
+
+    /* Sheet actions */
+    .sheet-actions { padding: 18px 18px 0; display: flex; gap: 10px; }
+    .btn-primary {
+      flex: 1; padding: 14px; border-radius: 14px;
+      background: var(--brand); color: #fff;
+      font-size: 15px; font-weight: 700; border: none;
+      cursor: pointer; touch-action: manipulation;
+    }
+    .btn-primary:disabled { opacity: .5; }
+    .btn-ghost {
+      flex: 1; padding: 14px; border-radius: 14px;
+      background: var(--bg-soft); color: var(--text);
+      font-size: 15px; font-weight: 700;
+      border: 1px solid var(--line);
+      cursor: pointer; touch-action: manipulation;
+    }
+
+    /* ── Confirm dialog ── */
+    .confirm-overlay {
+      position: fixed; inset: 0; z-index: 60;
+      background: rgba(0,0,0,.65);
+      display: flex; align-items: center; justify-content: center; padding: 24px;
+      opacity: 0; pointer-events: none; transition: opacity .2s;
+    }
+    .confirm-overlay.active { opacity: 1; pointer-events: all; }
+    .confirm-box {
+      width: 100%; max-width: 340px;
+      background: var(--surface); border-radius: 20px; padding: 22px 20px;
+    }
+    .confirm-title { font-size: 17px; font-weight: 800; margin-bottom: 6px; }
+    .confirm-text  { font-size: 14px; color: var(--text-muted); margin-bottom: 18px; line-height: 1.4; }
+    .confirm-btns  { display: flex; gap: 10px; }
+    .btn-danger {
+      flex: 1; padding: 13px; border-radius: 12px;
+      background: #ff3b30; color: #fff;
+      font-size: 15px; font-weight: 700; border: none;
+      cursor: pointer; touch-action: manipulation;
+    }
+
+    /* ── Page messages ── */
+    .page-msg { text-align: center; padding: 48px 24px; color: var(--text-muted); font-size: 15px; }
+    .page-msg.err { color: #ff3b30; }
+  </style>
+</head>
+<body>
+
+  <div class="topbar">
+    <div>
+      <div class="topbar-title">🏪 Filiallar</div>
+      <div class="topbar-sub" id="sub-count">Yuklanmoqda…</div>
+    </div>
+  </div>
+
+  <div id="branch-list" class="branch-list">
+    <div class="page-msg">Yuklanmoqda…</div>
+  </div>
+
+  <button class="fab" id="fab-add" title="Yangi filial qo'shish">＋</button>
+
+  <!-- ── Add / Edit sheet ── -->
+  <div class="sheet-overlay" id="sheet-overlay">
+    <div class="sheet" id="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-hdr" id="sheet-title">Filial qo'shish</div>
+
+      <div class="fg">
+        <div class="fg-label">Nomi *</div>
+        <input class="fg-input" id="f-name" type="text" placeholder="Burger House | Chilonzor">
+      </div>
+      <div class="fg">
+        <div class="fg-label">Manzil *</div>
+        <input class="fg-input" id="f-addr" type="text" placeholder="Chilonzor tumani, 14-kvartal">
+      </div>
+      <div class="fg">
+        <div class="fg-label">Telefon</div>
+        <input class="fg-input" id="f-phone" type="tel" placeholder="+998 90 000 00 00">
+      </div>
+      <div class="fg">
+        <div class="fg-label">Google Maps havolasi</div>
+        <input class="fg-input" id="f-maps" type="url" placeholder="https://maps.google.com/…">
+      </div>
+
+      <div class="hours-wrap">
+        <div class="hours-lbl">Ish vaqti (har kun)</div>
+        <div id="hours-grid"></div>
+      </div>
+
+      <div class="sheet-actions">
+        <button class="btn-ghost"    id="sheet-cancel">Bekor</button>
+        <button class="btn-primary"  id="sheet-save">Saqlash</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Delete confirm ── -->
+  <div class="confirm-overlay" id="confirm-overlay">
+    <div class="confirm-box">
+      <div class="confirm-title">🗑 O'chirilsinmi?</div>
+      <div class="confirm-text" id="confirm-text">Bu filial o'chiriladimi?</div>
+      <div class="confirm-btns">
+        <button class="btn-ghost"   id="confirm-no">Bekor</button>
+        <button class="btn-danger"  id="confirm-yes">O'chirish</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  (() => {
+    const tg = window.Telegram?.WebApp;
+    if (tg) { tg.ready(); tg.expand(); }
+
+    const url        = new URL(window.location.href);
+    const startParam = tg?.initDataUnsafe?.start_param || "";
+    const tenantId   = startParam || url.searchParams.get("tenant") || "tenant_001";
+    const initData   = tg?.initData || "";
+    const fallbackUid = parseInt(url.searchParams.get("uid") || "0") || null;
+
+    const DAYS = [
+      "Dushanba", "Seshanba", "Chorshanba",
+      "Payshanba", "Juma", "Shanba", "Yakshanba",
+    ];
+
+    function esc(s) {
+      return String(s ?? "").replace(/[&<>"']/g, c =>
+        ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    }
+
+    function authBody() {
+      return { tenant_id: tenantId, init_data: initData, fallback_uid: fallbackUid };
+    }
+
+    function authQs() {
+      let q = `tenant=${encodeURIComponent(tenantId)}&init_data=${encodeURIComponent(initData)}`;
+      if (fallbackUid) q += `&uid=${fallbackUid}`;
+      return q;
+    }
+
+    function showAlert(msg) {
+      if (tg) tg.showAlert(msg); else alert(msg);
+    }
+
+    // ─── Branch list ───────────────────────────────────────────────────────────
+    const listEl   = document.getElementById("branch-list");
+    const subCount = document.getElementById("sub-count");
+    let branches   = [];
+
+    async function load() {
+      listEl.innerHTML = `<div class="page-msg">Yuklanmoqda…</div>`;
+      try {
+        const r = await fetch(`/api/admin/branches?${authQs()}`);
+        if (!r.ok) throw new Error("Yuklab bo'lmadi: " + r.status);
+        const data = await r.json();
+        branches = data.branches || [];
+        render();
+      } catch (e) {
+        listEl.innerHTML = `<div class="page-msg err">⚠️ ${esc(e.message)}</div>`;
+      }
+    }
+
+    function render() {
+      subCount.textContent = `${branches.length} ta filial`;
+      if (!branches.length) {
+        listEl.innerHTML = `<div class="page-msg">Hali filial yo'q.<br>＋ tugmani bosib qo'shing.</div>`;
+        return;
+      }
+      listEl.innerHTML = "";
+      branches.forEach(b => listEl.appendChild(buildCard(b)));
+    }
+
+    function buildCard(b) {
+      const isOpen = b.is_open !== 0;
+      const card = document.createElement("div");
+      card.className = `bc ${isOpen ? "is-open" : "is-closed"}`;
+      card.dataset.bid = b.id;
+
+      card.innerHTML = `
+        <div class="bc-stripe"></div>
+        <div class="bc-body">
+          <div class="bc-header">
+            <div class="bc-info">
+              <div class="bc-name">${esc(b.name)}</div>
+              <div class="bc-addr">📍 ${esc(b.address)}</div>
+              ${b.phone ? `<div class="bc-phone">☎️ ${esc(b.phone)}</div>` : ""}
+            </div>
+            <div class="bc-right">
+              <span class="bc-badge ${isOpen ? "open" : "closed"}">${isOpen ? "🟢 Ochiq" : "🔴 Yopiq"}</span>
+              <label class="tsw" title="${isOpen ? "Ochiq" : "Yopiq"}">
+                <input type="checkbox" ${isOpen ? "checked" : ""}>
+                <div class="tsw-track"></div>
+                <div class="tsw-thumb"></div>
+              </label>
+            </div>
+          </div>
+          <div class="bc-actions">
+            <button class="bc-btn edit" data-act="edit">✏️ Tahrirlash</button>
+            <button class="bc-btn del"  data-act="del">🗑 O'chirish</button>
+          </div>
+        </div>
+      `;
+
+      card.querySelector('[data-act=edit]').addEventListener("click", () => openEdit(b));
+      card.querySelector('[data-act=del]').addEventListener("click",  () => askDelete(b));
+      card.querySelector('input[type=checkbox]').addEventListener("change", ev => {
+        doToggle(b.id, ev.target.checked, card, b);
+      });
+      return card;
+    }
+
+    // ─── Toggle open / closed ──────────────────────────────────────────────────
+    async function doToggle(bid, nowOpen, card, b) {
+      card.className = `bc ${nowOpen ? "is-open" : "is-closed"}`;
+      const badge = card.querySelector(".bc-badge");
+      badge.className = `bc-badge ${nowOpen ? "open" : "closed"}`;
+      badge.textContent = nowOpen ? "🟢 Ochiq" : "🔴 Yopiq";
+
+      try {
+        const r = await fetch("/api/admin/branches/toggle-open", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...authBody(), branch_id: bid, is_open: nowOpen }),
+        });
+        if (!r.ok) throw new Error("Saqlab bo'lmadi: " + r.status);
+        b.is_open = nowOpen ? 1 : 0;
+      } catch (e) {
+        const cb = card.querySelector("input[type=checkbox]");
+        if (cb) cb.checked = !nowOpen;
+        card.className = `bc ${!nowOpen ? "is-open" : "is-closed"}`;
+        badge.className = `bc-badge ${!nowOpen ? "open" : "closed"}`;
+        badge.textContent = !nowOpen ? "🟢 Ochiq" : "🔴 Yopiq";
+        showAlert(e.message);
+      }
+    }
+
+    // ─── Sheet (Add / Edit) ────────────────────────────────────────────────────
+    const sheetOverlay = document.getElementById("sheet-overlay");
+    const sheetTitle   = document.getElementById("sheet-title");
+    const hoursGrid    = document.getElementById("hours-grid");
+    let editingId = null;
+
+    function buildHoursGrid(hours) {
+      hoursGrid.innerHTML = "";
+      DAYS.forEach(day => {
+        const val    = (hours && hours[day]) || "";
+        const isOpen = Boolean(val);
+        const row    = document.createElement("div");
+        row.className = "day-row";
+        row.innerHTML = `
+          <span class="day-lbl">${day}</span>
+          <input type="checkbox" class="day-chk" id="dc-${day}" ${isOpen ? "checked" : ""}>
+          <input type="text" class="day-time" id="dt-${day}"
+            value="${esc(val)}" placeholder="09:00 - 22:00" ${isOpen ? "" : "disabled"}>
+        `;
+        row.querySelector(`#dc-${day}`).addEventListener("change", ev => {
+          const ti = row.querySelector(`#dt-${day}`);
+          ti.disabled = !ev.target.checked;
+          if (ev.target.checked && !ti.value.trim()) ti.value = "09:00 - 22:00";
+        });
+        hoursGrid.appendChild(row);
+      });
+    }
+
+    function collectHoursJson() {
+      const h = {};
+      DAYS.forEach(day => {
+        const chk = document.getElementById(`dc-${day}`);
+        const ti  = document.getElementById(`dt-${day}`);
+        if (chk?.checked && ti?.value.trim()) h[day] = ti.value.trim();
+      });
+      return JSON.stringify(h);
+    }
+
+    function openAdd() {
+      editingId = null;
+      sheetTitle.textContent = "➕ Yangi filial qo'shish";
+      document.getElementById("f-name").value  = "";
+      document.getElementById("f-addr").value  = "";
+      document.getElementById("f-phone").value = "";
+      document.getElementById("f-maps").value  = "";
+      buildHoursGrid(null);
+      sheetOverlay.classList.add("active");
+    }
+
+    function openEdit(b) {
+      editingId = b.id;
+      sheetTitle.textContent = "✏️ Filial tahrirlash";
+      document.getElementById("f-name").value  = b.name     || "";
+      document.getElementById("f-addr").value  = b.address  || "";
+      document.getElementById("f-phone").value = b.phone    || "";
+      document.getElementById("f-maps").value  = b.maps_url || "";
+      buildHoursGrid(b.hours || null);
+      sheetOverlay.classList.add("active");
+    }
+
+    function closeSheet() { sheetOverlay.classList.remove("active"); }
+
+    document.getElementById("fab-add").addEventListener("click", openAdd);
+    document.getElementById("sheet-cancel").addEventListener("click", closeSheet);
+    sheetOverlay.addEventListener("click", e => { if (e.target === sheetOverlay) closeSheet(); });
+
+    document.getElementById("sheet-save").addEventListener("click", async () => {
+      const name = document.getElementById("f-name").value.trim();
+      const addr = document.getElementById("f-addr").value.trim();
+      if (!name || !addr) { showAlert("Nomi va manzil majburiy."); return; }
+
+      const saveBtn = document.getElementById("sheet-save");
+      saveBtn.disabled = true;
+      saveBtn.textContent = "…";
+      try {
+        const payload = {
+          ...authBody(),
+          name, address: addr,
+          phone:      document.getElementById("f-phone").value.trim(),
+          maps_url:   document.getElementById("f-maps").value.trim(),
+          hours_json: collectHoursJson(),
+        };
+        const endpoint = editingId
+          ? "/api/admin/branches/update"
+          : "/api/admin/branches/add";
+        if (editingId) payload.branch_id = editingId;
+
+        const r = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!r.ok) throw new Error("Saqlab bo'lmadi: " + r.status);
+        closeSheet();
+        await load();
+      } catch (e) {
+        showAlert(e.message);
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = "Saqlash";
+      }
+    });
+
+    // ─── Delete ────────────────────────────────────────────────────────────────
+    const confirmOverlay = document.getElementById("confirm-overlay");
+    const confirmText    = document.getElementById("confirm-text");
+    let pendingDeleteId  = null;
+
+    function askDelete(b) {
+      pendingDeleteId = b.id;
+      confirmText.textContent = `"${b.name}" filialni o'chirmoqchimisiz?`;
+      confirmOverlay.classList.add("active");
+    }
+
+    document.getElementById("confirm-no").addEventListener("click", () => {
+      confirmOverlay.classList.remove("active");
+      pendingDeleteId = null;
+    });
+
+    document.getElementById("confirm-yes").addEventListener("click", async () => {
+      if (!pendingDeleteId) return;
+      const bid = pendingDeleteId;
+      confirmOverlay.classList.remove("active");
+      pendingDeleteId = null;
+      try {
+        const r = await fetch("/api/admin/branches/delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...authBody(), branch_id: bid }),
+        });
+        if (!r.ok) throw new Error("O'chirib bo'lmadi: " + r.status);
+        await load();
+      } catch (e) {
+        showAlert(e.message);
+      }
+    });
+
+    load();
+  })();
+  </script>
+</body>
+</html>

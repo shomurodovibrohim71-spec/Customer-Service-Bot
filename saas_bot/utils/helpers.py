@@ -120,10 +120,15 @@ def confirm_keyboard() -> InlineKeyboardMarkup:
 
 def order_admin_keyboard(order_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
-        [[
-            InlineKeyboardButton("✅ Tasdiqlash", callback_data=f"adm_confirm:{order_id}"),
-            InlineKeyboardButton("❌ Bekor qilish", callback_data=f"adm_cancel:{order_id}"),
-        ]]
+        [
+            [
+                InlineKeyboardButton("✅ Tasdiqlash", callback_data=f"adm_confirm:{order_id}"),
+                InlineKeyboardButton("❌ Bekor qilish", callback_data=f"adm_cancel:{order_id}"),
+            ],
+            [
+                InlineKeyboardButton("🚀 Yetkazildi", callback_data=f"adm_delivered:{order_id}"),
+            ],
+        ]
     )
 
 
