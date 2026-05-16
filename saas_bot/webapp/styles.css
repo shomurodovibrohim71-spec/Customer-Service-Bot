@@ -308,27 +308,32 @@ button, a, [role="button"] { min-height: 44px; }
 
 /* ---------- Cart upsell block ----------------------------------------- */
 .upsell-block {
-  padding: 0 14px 14px;
+  padding: 0 0 14px;   /* NO side padding — list must overflow freely */
 }
 .upsell-title {
   font-size: 13px; font-weight: 700; color: var(--text-muted);
   text-transform: uppercase; letter-spacing: .05em;
   margin-bottom: 10px;
+  padding: 0 14px;     /* only title gets side padding */
 }
 .upsell-list {
   display: flex; gap: 10px;
-  overflow-x: auto; padding-bottom: 4px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;   /* smooth iOS momentum scroll */
+  touch-action: pan-x;
+  scroll-snap-type: x proximity;
+  padding: 4px 14px 8px;              /* visible margin left/right + bottom shadow room */
   scrollbar-width: none;
 }
 .upsell-list::-webkit-scrollbar { display: none; }
 .upsell-card {
-  flex: 0 0 130px;
+  flex: 0 0 130px;                     /* never shrink */
+  scroll-snap-align: start;
   background: var(--surface); border: 1px solid var(--line);
   border-radius: var(--r-md); overflow: hidden;
   display: flex; flex-direction: column;
   transition: border-color .15s;
 }
-.upsell-card:has(.upsell-add-btn:hover) { border-color: var(--brand); }
 .upsell-img {
   width: 100%; height: 80px;
   background: var(--bg) center/cover no-repeat;
@@ -346,9 +351,7 @@ button, a, [role="button"] { min-height: 44px; }
   transition: filter .15s;
 }
 .upsell-add-btn:active { filter: brightness(.88); }
-.upsell-add-btn.in-cart {
-  background: var(--bg-soft); color: var(--brand);
-}
+.upsell-add-btn.in-cart { background: var(--bg-soft); color: var(--brand); }
 
 /* ---------- Checkout cards (Yandex-inspired clean rows) ---------------- */
 .checkout-form { gap: 14px; padding-bottom: 24px; }
