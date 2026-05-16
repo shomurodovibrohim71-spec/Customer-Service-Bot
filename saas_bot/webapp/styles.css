@@ -316,13 +316,34 @@ button, a, [role="button"] { min-height: 44px; }
   margin-bottom: 10px;
   padding: 0 14px;     /* only title gets side padding */
 }
+/* Category chips */
+.upsell-chips {
+  display: flex; gap: 8px;
+  overflow-x: auto; padding: 4px 14px 10px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.upsell-chips::-webkit-scrollbar { display: none; }
+.upsell-chip {
+  flex-shrink: 0;
+  padding: 6px 14px; border-radius: var(--r-pill);
+  background: var(--surface); border: 1px solid var(--line);
+  font-size: 12px; font-weight: 700; color: var(--text-muted);
+  cursor: pointer; white-space: nowrap;
+  transition: all .18s var(--ease);
+}
+.upsell-chip.active {
+  background: var(--brand-grad); border-color: transparent; color: #fff;
+}
+.upsell-chip:active { transform: scale(0.96); }
+
 .upsell-list {
   display: flex; gap: 10px;
   overflow-x: auto;
-  -webkit-overflow-scrolling: touch;   /* smooth iOS momentum scroll */
+  -webkit-overflow-scrolling: touch;
   touch-action: pan-x;
   scroll-snap-type: x proximity;
-  padding: 4px 14px 8px;              /* visible margin left/right + bottom shadow room */
+  padding: 4px 14px 8px;
   scrollbar-width: none;
 }
 .upsell-list::-webkit-scrollbar { display: none; }

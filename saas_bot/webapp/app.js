@@ -295,47 +295,33 @@
     $("cartSumTotal").textContent = fmt(cartTotal());
   }
 
-  // Priority order for upsell suggestions (categories shown first when missing from cart)
+  // Category priority for upsell chips (categories shown first)
   const UPSELL_PRIORITY = [
-    "🥤 Ichimliklar", "🥟 Somsa", "🥗 Salatlar", "🍮 Shirinliklar",
+    "🥤 Ichimliklar", "🥗 Salatlar", "🥟 Somsa", "🍮 Shirinliklar",
     "🍲 Sho'rvalar", "🍚 Plov", "🥩 Kabob",
   ];
 
-  function renderCartUpsells() {
-    const block = $("upsellBlock");
-    const list  = $("upsellList");
-    if (!block || !list || !state.menu?.products) return;
+  // Track which upsell chip is selected
+  const upsellState = { activeChip: null };
 
-    // Collect categories already in cart
-    const inCartIds = new Set(Object.keys(state.cart).map(Number));
-    const catsInCart = new Set();
-    for (const [cat, items] of Object.entries(state.menu.products)) {
-      if (items.some(p => inCartIds.has(p.id))) catsInCart.add(cat);
-    }
-
-    // Gather up to 10 suggestions: prefer categories NOT in cart
-    const suggestions = [];
-    const allCats = [
-      ...UPSELL_PRIORITY.filter(c => state.menu.products[c]),
-      ...Object.keys(state.menu.products).filter(c => !UPSELL_PRIORITY.includes(c)),
+  function upsellCats() {
+    if (!state.menu?.products) return [];
+    const all = [
+      ...UPSELL_PRIORITY.filter(c => state.menu.products[c]?.length),
+      ...Object.keys(state.menu.products).filter(c => !UPSELL_PRIORITY.includes(c) && state.menu.products[c]?.length),
     ];
+    return all;
+  }
 
-    for (const cat of allCats) {
-      if (suggestions.length >= 10) break;
-      const items = (state.menu.products[cat] || []).filter(p => p.in_stock !== 0);
-      if (!items.length) continue;
-      // Pick items from this category not yet in cart
-      for (const p of items) {
-        if (suggestions.length >= 10) break;
-        if (!inCartIds.has(p.id)) suggestions.push(p);
-      }
-    }
-
-    if (!suggestions.length) { block.classList.add("hidden"); return; }
-    block.classList.remove("hidden");
+  function renderUpsellProducts(cat) {
+    const list = $("upsellList");
+    if (!list) return;
+    const inCartIds = new Set(Object.keys(state.cart).map(Number));
+    const products = (state.menu?.products[cat] || []).filter(p => p.in_stock !== 0);
     list.innerHTML = "";
+    list.scrollLeft = 0;
 
-    suggestions.forEach(p => {
+    products.forEach(p => {
       const card = document.createElement("div");
       card.className = "upsell-card";
       const imgHtml = p.image_url
@@ -349,7 +335,7 @@
           <div class="upsell-price">${fmt(p.price_value)}</div>
         </div>
         <button class="upsell-add-btn${inCart ? " in-cart" : ""}" data-pid="${p.id}">
-          ${inCart ? "✓ " + (state.cart[p.id] || 1) + " ta" : "➕ Qo'shish"}
+          ${inCart ? "✓ " + (state.cart[p.id]) + " ta" : "➕ Qo'shish"}
         </button>
       `;
       card.querySelector(".upsell-add-btn").onclick = (e) => {
@@ -357,11 +343,50 @@
         state.cart[p.id] = (state.cart[p.id] || 0) + 1;
         refreshCartBar();
         renderCartItems();
-        renderCartUpsells();
+        renderUpsellProducts(upsellState.activeChip);
         if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred("light");
       };
       list.appendChild(card);
     });
+  }
+
+  function renderCartUpsells() {
+    const block  = $("upsellBlock");
+    const chips  = $("upsellChips");
+    if (!block || !chips || !state.menu?.products) return;
+
+    const cats = upsellCats();
+    if (!cats.length) { block.classList.add("hidden"); return; }
+
+    block.classList.remove("hidden");
+
+    // Pick default chip: first category NOT in cart, else first category
+    const inCartIds = new Set(Object.keys(state.cart).map(Number));
+    const notInCart = cats.find(c =>
+      !(state.menu.products[c] || []).some(p => inCartIds.has(p.id))
+    );
+    if (!upsellState.activeChip || !cats.includes(upsellState.activeChip)) {
+      upsellState.activeChip = notInCart || cats[0];
+    }
+
+    // Render chips
+    chips.innerHTML = "";
+    cats.forEach(cat => {
+      const btn = document.createElement("button");
+      btn.className = "upsell-chip" + (cat === upsellState.activeChip ? " active" : "");
+      btn.textContent = cat;
+      btn.onclick = () => {
+        upsellState.activeChip = cat;
+        chips.querySelectorAll(".upsell-chip").forEach(b =>
+          b.classList.toggle("active", b === btn)
+        );
+        renderUpsellProducts(cat);
+        if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred("light");
+      };
+      chips.appendChild(btn);
+    });
+
+    renderUpsellProducts(upsellState.activeChip);
   }
 
   function openCart() {
