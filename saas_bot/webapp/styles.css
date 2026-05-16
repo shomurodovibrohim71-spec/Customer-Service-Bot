@@ -306,6 +306,50 @@ button, a, [role="button"] { min-height: 44px; }
 .row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 15px; }
 .row.total { font-size: 18px; font-weight: 800; padding-top: 10px; border-top: 1px dashed var(--line); margin-top: 4px; }
 
+/* ---------- Cart upsell block ----------------------------------------- */
+.upsell-block {
+  padding: 0 14px 14px;
+}
+.upsell-title {
+  font-size: 13px; font-weight: 700; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: .05em;
+  margin-bottom: 10px;
+}
+.upsell-list {
+  display: flex; gap: 10px;
+  overflow-x: auto; padding-bottom: 4px;
+  scrollbar-width: none;
+}
+.upsell-list::-webkit-scrollbar { display: none; }
+.upsell-card {
+  flex: 0 0 130px;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--r-md); overflow: hidden;
+  display: flex; flex-direction: column;
+  transition: border-color .15s;
+}
+.upsell-card:has(.upsell-add-btn:hover) { border-color: var(--brand); }
+.upsell-img {
+  width: 100%; height: 80px;
+  background: var(--bg) center/cover no-repeat;
+  flex-shrink: 0;
+}
+.upsell-img-placeholder { display: flex; align-items: center; justify-content: center; font-size: 28px; background: var(--bg-soft); }
+.upsell-info { padding: 8px 8px 0; flex: 1; }
+.upsell-name { font-size: 12px; font-weight: 600; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.upsell-price { font-size: 12px; font-weight: 800; color: var(--brand); margin-top: 4px; }
+.upsell-add-btn {
+  margin: 6px 8px 8px; padding: 7px 0;
+  background: var(--brand-grad); color: #fff;
+  border: none; border-radius: var(--r-sm);
+  font-size: 12px; font-weight: 700; cursor: pointer;
+  transition: filter .15s;
+}
+.upsell-add-btn:active { filter: brightness(.88); }
+.upsell-add-btn.in-cart {
+  background: var(--bg-soft); color: var(--brand);
+}
+
 /* ---------- Checkout cards (Yandex-inspired clean rows) ---------------- */
 .checkout-form { gap: 14px; padding-bottom: 24px; }
 .co-card {

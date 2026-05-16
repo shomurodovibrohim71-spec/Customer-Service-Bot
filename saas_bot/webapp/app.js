@@ -295,9 +295,79 @@
     $("cartSumTotal").textContent = fmt(cartTotal());
   }
 
+  // Priority order for upsell suggestions (categories shown first when missing from cart)
+  const UPSELL_PRIORITY = [
+    "🥤 Ichimliklar", "🥟 Somsa", "🥗 Salatlar", "🍮 Shirinliklar",
+    "🍲 Sho'rvalar", "🍚 Plov", "🥩 Kabob",
+  ];
+
+  function renderCartUpsells() {
+    const block = $("upsellBlock");
+    const list  = $("upsellList");
+    if (!block || !list || !state.menu?.products) return;
+
+    // Collect categories already in cart
+    const inCartIds = new Set(Object.keys(state.cart).map(Number));
+    const catsInCart = new Set();
+    for (const [cat, items] of Object.entries(state.menu.products)) {
+      if (items.some(p => inCartIds.has(p.id))) catsInCart.add(cat);
+    }
+
+    // Gather up to 10 suggestions: prefer categories NOT in cart
+    const suggestions = [];
+    const allCats = [
+      ...UPSELL_PRIORITY.filter(c => state.menu.products[c]),
+      ...Object.keys(state.menu.products).filter(c => !UPSELL_PRIORITY.includes(c)),
+    ];
+
+    for (const cat of allCats) {
+      if (suggestions.length >= 10) break;
+      const items = (state.menu.products[cat] || []).filter(p => p.in_stock !== 0);
+      if (!items.length) continue;
+      // Pick items from this category not yet in cart
+      for (const p of items) {
+        if (suggestions.length >= 10) break;
+        if (!inCartIds.has(p.id)) suggestions.push(p);
+      }
+    }
+
+    if (!suggestions.length) { block.classList.add("hidden"); return; }
+    block.classList.remove("hidden");
+    list.innerHTML = "";
+
+    suggestions.forEach(p => {
+      const card = document.createElement("div");
+      card.className = "upsell-card";
+      const imgHtml = p.image_url
+        ? `<div class="upsell-img" style="background-image:url('${escapeHtml(p.image_url)}')"></div>`
+        : `<div class="upsell-img upsell-img-placeholder">🍽️</div>`;
+      const inCart = !!state.cart[p.id];
+      card.innerHTML = `
+        ${imgHtml}
+        <div class="upsell-info">
+          <div class="upsell-name">${escapeHtml(p.name)}</div>
+          <div class="upsell-price">${fmt(p.price_value)}</div>
+        </div>
+        <button class="upsell-add-btn${inCart ? " in-cart" : ""}" data-pid="${p.id}">
+          ${inCart ? "✓ " + (state.cart[p.id] || 1) + " ta" : "➕ Qo'shish"}
+        </button>
+      `;
+      card.querySelector(".upsell-add-btn").onclick = (e) => {
+        e.stopPropagation();
+        state.cart[p.id] = (state.cart[p.id] || 0) + 1;
+        refreshCartBar();
+        renderCartItems();
+        renderCartUpsells();
+        if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred("light");
+      };
+      list.appendChild(card);
+    });
+  }
+
   function openCart() {
     openScreen("cartScreen");
     renderCartItems();
+    renderCartUpsells();
   }
   $("cartBack").onclick = () => closeScreen("cartScreen");
 

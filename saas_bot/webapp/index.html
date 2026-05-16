@@ -42,6 +42,13 @@
       <h2 data-t="cart_title">🛒 Savatcha</h2>
     </header>
     <div id="cartItems" class="cart-items"></div>
+
+    <!-- Upsell: Add-ons suggestion block -->
+    <div id="upsellBlock" class="upsell-block hidden">
+      <div class="upsell-title" data-t="upsell_title">➕ Qo'shimcha qo'shish</div>
+      <div id="upsellList" class="upsell-list"></div>
+    </div>
+
     <div class="cart-summary">
       <div class="row"><span data-t="lbl_total">Jami:</span><strong id="cartSumTotal">0</strong></div>
       <button id="checkoutBtn" class="primary-btn" data-t="place_order">Buyurtma berish</button>
@@ -307,6 +314,7 @@
         status_preparing: "👨‍🍳 Tayyorlanmoqda", status_on_the_way: "🚗 Yo'lda",
         status_delivered: "📦 Yetkazilgan", status_cancelled: "❌ Bekor qilingan",
         soum: "so'm", add_to_cart: "➕ Qo'shish", more_items: "+{n}", out_of_stock: "Tugadi",
+        upsell_title: "➕ Buyurtmangizga qo'shing",
         addr_confirm_q: "Shu manzilga buyurtma berilsinmi?",
         addr_yes: "✅ Ha, shu yerga", addr_no: "✏ Boshqa manzil",
         extend_label: "➕ Buyurtma #", extend_to: "ga qo'shimcha",
@@ -369,6 +377,7 @@
         status_preparing: "👨‍🍳 Preparing", status_on_the_way: "🚗 On the way",
         status_delivered: "📦 Delivered", status_cancelled: "❌ Cancelled",
         soum: "so'm", add_to_cart: "➕ Add", more_items: "+{n}", out_of_stock: "Sold out",
+        upsell_title: "➕ Add to your order",
         addr_confirm_q: "Order to this address?",
         addr_yes: "✅ Yes, here", addr_no: "✏ Different address",
         extend_label: "➕ Adding to order #", extend_to: "",
@@ -431,6 +440,7 @@
         status_preparing: "👨‍🍳 Готовится", status_on_the_way: "🚗 В пути",
         status_delivered: "📦 Доставлен", status_cancelled: "❌ Отменён",
         soum: "сум", add_to_cart: "➕ Добавить", more_items: "+{n}", out_of_stock: "Нет в наличии",
+        upsell_title: "➕ Добавить к заказу",
         addr_confirm_q: "Заказ на этот адрес?",
         addr_yes: "✅ Да, сюда", addr_no: "✏ Другой адрес",
         extend_label: "➕ Дополнение к заказу #", extend_to: "",
