@@ -8,65 +8,144 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <link rel="stylesheet" href="/static/styles.css">
   <style>
-    .courier-card { background: var(--card); border-radius: 14px; padding: 14px 16px; margin: 0 14px 10px; }
-    .courier-card-top { display: flex; justify-content: space-between; align-items: center; }
-    .courier-name { font-weight: 600; font-size: 15px; color: var(--text); }
-    .courier-phone { font-size: 13px; color: var(--sub); margin-top: 3px; }
-    .courier-tg { font-size: 12px; color: var(--sub); margin-top: 2px; }
-    .courier-actions { display: flex; gap: 8px; margin-top: 10px; }
-    .c-btn { flex: 1; padding: 8px 0; border-radius: 10px; border: none; font-size: 13px; cursor: pointer; font-weight: 600; }
-    .c-btn-edit { background: var(--accent); color: #fff; }
-    .c-btn-toggle { background: var(--card2, #2a2d35); color: var(--sub); }
-    .c-btn-toggle.inactive { color: #4ade80; }
-    .c-btn-del { background: #ff4d4d22; color: #ff4d4d; }
-    .inactive-badge { background: #ff4d4d33; color: #ff4d4d; font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: 600; }
-    .active-badge { background: #4ade8033; color: #4ade80; font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: 600; }
-    /* Add/Edit modal */
-    .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 200; display: flex; flex-direction: column; justify-content: flex-end; }
-    .modal-sheet { background: var(--bg); border-radius: 18px 18px 0 0; padding: 20px 16px 36px; }
-    .modal-title { font-size: 17px; font-weight: 700; margin-bottom: 16px; }
-    .modal-field { margin-bottom: 12px; }
-    .modal-field label { display: block; font-size: 12px; color: var(--sub); margin-bottom: 4px; }
-    .modal-field input { width: 100%; background: var(--card); border: none; border-radius: 10px; padding: 11px 14px; color: var(--text); font-size: 15px; outline: none; box-sizing: border-box; }
-    .modal-btns { display: flex; gap: 10px; margin-top: 16px; }
-    .modal-save { flex: 1; background: var(--accent); color: #fff; border: none; border-radius: 12px; padding: 13px; font-size: 15px; font-weight: 700; cursor: pointer; }
-    .modal-cancel { flex: 1; background: var(--card); color: var(--sub); border: none; border-radius: 12px; padding: 13px; font-size: 15px; cursor: pointer; }
-    .fab { position: fixed; bottom: 28px; right: 20px; background: var(--accent); color: #fff; border: none; width: 54px; height: 54px; border-radius: 50%; font-size: 26px; cursor: pointer; box-shadow: 0 4px 18px #0006; display: flex; align-items: center; justify-content: center; z-index: 100; }
+    /* ── Admin Couriers — premium design ──────────────────────── */
+    .ac-topbar {
+      position: sticky; top: 0; z-index: 10;
+      background: rgba(15,17,21,0.92);
+      backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+      border-bottom: 1px solid var(--line);
+      padding: 14px 16px 12px;
+    }
+    .ac-topbar-row { display: flex; align-items: center; justify-content: space-between; }
+    .ac-title { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
+    .ac-count-pill {
+      background: var(--brand-grad); color: #fff;
+      font-size: 12px; font-weight: 700;
+      padding: 3px 10px; border-radius: var(--r-pill);
+    }
+
+    /* List */
+    .ac-list { padding: 10px 14px 120px; display: flex; flex-direction: column; gap: 8px; }
+
+    /* Courier card */
+    .ac-card {
+      background: var(--surface); border: 1px solid var(--line);
+      border-radius: var(--r-lg); overflow: hidden; position: relative;
+    }
+    .ac-card.inactive { opacity: .55; }
+    .ac-card-stripe { position: absolute; left: 0; top: 0; bottom: 0; width: 4px; }
+    .ac-card-stripe.active-stripe { background: #4ade80; }
+    .ac-card-stripe.inactive-stripe { background: var(--line-strong); }
+    .ac-card-inner { padding: 13px 13px 13px 18px; }
+    .ac-card-row1 { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+    .ac-name { font-size: 15px; font-weight: 700; }
+    .ac-active-badge { background: rgba(74,222,128,.16); color: #4ade80; font-size: 10px; font-weight: 800; padding: 2px 9px; border-radius: var(--r-pill); }
+    .ac-inactive-badge { background: rgba(255,93,93,.12); color: var(--danger); font-size: 10px; font-weight: 800; padding: 2px 9px; border-radius: var(--r-pill); }
+    .ac-phone { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
+    .ac-tg { font-size: 11px; color: var(--accent); margin-bottom: 8px; }
+    .ac-actions { display: flex; gap: 6px; }
+    .ac-btn {
+      flex: 1; padding: 7px 0; border-radius: var(--r-md); border: none;
+      font-size: 12px; font-weight: 700; cursor: pointer; text-align: center;
+      transition: opacity .15s, transform .1s var(--ease);
+    }
+    .ac-btn:active { opacity: .75; transform: scale(0.97); }
+    .ac-btn-edit { background: rgba(255,122,24,.15); color: var(--brand); }
+    .ac-btn-toggle-on  { background: rgba(255,93,93,.15); color: var(--danger); }
+    .ac-btn-toggle-off { background: rgba(74,222,128,.15); color: #4ade80; }
+    .ac-btn-del  { background: rgba(255,93,93,.1); color: var(--danger); max-width: 44px; }
+
+    /* FAB */
+    .ac-fab {
+      position: fixed; bottom: 28px; right: 18px; z-index: 100;
+      width: 52px; height: 52px; border-radius: 50%; border: none;
+      background: var(--brand-grad); color: #fff;
+      font-size: 24px; cursor: pointer;
+      box-shadow: 0 4px 20px rgba(255,122,24,.45);
+      display: flex; align-items: center; justify-content: center;
+      transition: transform .15s var(--ease), box-shadow .15s;
+    }
+    .ac-fab:active { transform: scale(0.94); box-shadow: 0 2px 10px rgba(255,122,24,.3); }
+
+    /* Sheet modal */
+    .ac-sheet-bg {
+      position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 200;
+      display: flex; flex-direction: column; justify-content: flex-end;
+      animation: fadeIn .2s ease;
+    }
+    @keyframes fadeIn { from { opacity:0 } to { opacity:1 } }
+    .ac-sheet {
+      background: var(--bg-soft); border-radius: 20px 20px 0 0;
+      padding: 0 16px 36px; animation: slideUp .25s var(--ease);
+    }
+    @keyframes slideUp { from { transform:translateY(100%) } to { transform:translateY(0) } }
+    .ac-sheet-handle { width: 36px; height: 4px; background: var(--line-strong); border-radius: 2px; margin: 10px auto 16px; }
+    .ac-sheet-title { font-size: 18px; font-weight: 800; margin-bottom: 16px; }
+
+    .ac-field { margin-bottom: 12px; }
+    .ac-field label { display: block; font-size: 11px; color: var(--text-muted); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; margin-bottom: 5px; }
+    .ac-field input {
+      width: 100%; background: var(--surface); border: 1px solid var(--line);
+      border-radius: var(--r-md); padding: 12px 14px; color: var(--text);
+      font-size: 15px; outline: none; box-sizing: border-box;
+      transition: border-color .2s;
+    }
+    .ac-field input:focus { border-color: var(--brand); }
+
+    .ac-sheet-btns { display: flex; gap: 8px; margin-top: 18px; }
+    .ac-save {
+      flex: 1; background: var(--brand-grad); color: #fff; border: none;
+      border-radius: var(--r-md); padding: 14px; font-size: 15px; font-weight: 800;
+      cursor: pointer; transition: opacity .15s;
+    }
+    .ac-save:disabled { opacity: .5; }
+    .ac-cancel {
+      flex: 1; background: var(--surface); color: var(--text-muted); border: 1px solid var(--line);
+      border-radius: var(--r-md); padding: 14px; font-size: 15px; cursor: pointer;
+    }
+
+    .ac-empty { text-align: center; padding: 60px 0; color: var(--text-muted); font-size: 14px; }
+    .ac-empty-icon { font-size: 44px; display: block; margin-bottom: 14px; }
+    .ac-loading { text-align: center; padding: 48px 0; color: var(--text-muted); font-size: 14px; }
   </style>
 </head>
 <body>
-  <header class="topbar">
-    <div class="page-title" data-t="page_title">🚗 Kuryerlar</div>
-    <div class="page-sub" id="totalSub">—</div>
-  </header>
+  <!-- Topbar -->
+  <div class="ac-topbar">
+    <div class="ac-topbar-row">
+      <div class="ac-title" data-t="page_title">🚗 Kuryerlar</div>
+      <div class="ac-count-pill" id="totalPill">—</div>
+    </div>
+  </div>
 
-  <main>
-    <div id="errBox" class="err hidden" style="margin:14px"></div>
-    <div id="loading" class="loading" data-t="loading">Yuklanmoqda…</div>
-    <div id="courierList" style="padding-top:10px"></div>
-  </main>
+  <!-- List -->
+  <div class="ac-list" id="courierList">
+    <div class="ac-loading" data-t="loading">Yuklanmoqda…</div>
+  </div>
 
-  <button class="fab" onclick="openAdd()" title="Yangi kuryer">+</button>
+  <!-- FAB -->
+  <button class="ac-fab" onclick="openAdd()">+</button>
 
-  <!-- Add/Edit modal -->
-  <div id="modalBg" class="modal-bg hidden">
-    <div class="modal-sheet">
-      <div class="modal-title" id="modalTitle" data-t="add_title">Yangi kuryer</div>
-      <div class="modal-field">
+  <!-- Add/Edit sheet -->
+  <div id="sheetBg" class="ac-sheet-bg hidden">
+    <div class="ac-sheet">
+      <div class="ac-sheet-handle"></div>
+      <div class="ac-sheet-title" id="sheetTitle" data-t="add_title">Yangi kuryer</div>
+      <div class="ac-field">
         <label data-t="lbl_name">Ism</label>
         <input id="fName" type="text" placeholder="Sardor Toshmatov">
       </div>
-      <div class="modal-field">
+      <div class="ac-field">
         <label data-t="lbl_phone">Telefon</label>
         <input id="fPhone" type="tel" placeholder="+998901234567">
       </div>
-      <div class="modal-field">
-        <label data-t="lbl_tg">Telegram ID (ixtiyoriy)</label>
-        <input id="fTg" type="number" placeholder="123456789">
+      <div class="ac-field">
+        <label data-t="lbl_tg">Telegram ID</label>
+        <input id="fTg" type="number" placeholder="123456789 (ixtiyoriy)">
       </div>
-      <div class="modal-btns">
-        <button class="modal-cancel" onclick="closeModal()" data-t="btn_cancel">Bekor</button>
-        <button class="modal-save" id="modalSaveBtn" onclick="saveModal()" data-t="btn_save">Saqlash</button>
+      <div class="ac-sheet-btns">
+        <button class="ac-cancel" onclick="closeSheet()" data-t="btn_cancel">Bekor</button>
+        <button class="ac-save"   id="saveBtn" onclick="saveSheet()" data-t="btn_save">Saqlash</button>
       </div>
     </div>
   </div>
@@ -74,26 +153,29 @@
   <script>
     window.STRINGS = {
       uz: { page_title:"🚗 Kuryerlar", loading:"Yuklanmoqda…",
-            total:"{n} ta kuryer", add_title:"Yangi kuryer", edit_title:"Kuryerni tahrirlash",
-            lbl_name:"Ism", lbl_phone:"Telefon", lbl_tg:"Telegram ID (ixtiyoriy)",
-            btn_cancel:"Bekor", btn_save:"Saqlash", btn_edit:"✏️ Tahrir", btn_del:"🗑",
-            btn_activate:"✅ Faollashtirish", btn_deactivate:"⏸ To'xtatish",
-            active:"Faol", inactive:"Nofaol", no_couriers:"Kuryerlar yo'q",
-            tg_id:"TG ID:", confirm_del:"O'chirishni tasdiqlaysizmi?" },
+            n_couriers:"{n} ta kuryer", add_title:"Yangi kuryer", edit_title:"Kuryerni tahrirlash",
+            lbl_name:"Ism", lbl_phone:"Telefon", lbl_tg:"Telegram ID",
+            btn_cancel:"Bekor", btn_save:"Saqlash",
+            btn_edit:"✏️ Tahrir", btn_on:"⏸ To'xtatish", btn_off:"✅ Faollashtirish", btn_del:"🗑",
+            active:"Faol", inactive:"Nofaol",
+            tg_hint:"TG ID: {id}", no_tg:"Telegram ID yo'q",
+            no_couriers:"Kuryerlar hali qo'shilmagan", confirm_del:"O'chirishni tasdiqlaysizmi?" },
       en: { page_title:"🚗 Couriers", loading:"Loading…",
-            total:"{n} couriers", add_title:"New courier", edit_title:"Edit courier",
-            lbl_name:"Name", lbl_phone:"Phone", lbl_tg:"Telegram ID (optional)",
-            btn_cancel:"Cancel", btn_save:"Save", btn_edit:"✏️ Edit", btn_del:"🗑",
-            btn_activate:"✅ Activate", btn_deactivate:"⏸ Deactivate",
-            active:"Active", inactive:"Inactive", no_couriers:"No couriers yet",
-            tg_id:"TG ID:", confirm_del:"Confirm deletion?" },
+            n_couriers:"{n} couriers", add_title:"New courier", edit_title:"Edit courier",
+            lbl_name:"Name", lbl_phone:"Phone", lbl_tg:"Telegram ID",
+            btn_cancel:"Cancel", btn_save:"Save",
+            btn_edit:"✏️ Edit", btn_on:"⏸ Deactivate", btn_off:"✅ Activate", btn_del:"🗑",
+            active:"Active", inactive:"Inactive",
+            tg_hint:"TG ID: {id}", no_tg:"No Telegram ID",
+            no_couriers:"No couriers added yet", confirm_del:"Confirm deletion?" },
       ru: { page_title:"🚗 Курьеры", loading:"Загрузка…",
-            total:"{n} курьеров", add_title:"Новый курьер", edit_title:"Редактировать курьера",
-            lbl_name:"Имя", lbl_phone:"Телефон", lbl_tg:"Telegram ID (необязательно)",
-            btn_cancel:"Отмена", btn_save:"Сохранить", btn_edit:"✏️ Изменить", btn_del:"🗑",
-            btn_activate:"✅ Активировать", btn_deactivate:"⏸ Деактивировать",
-            active:"Активен", inactive:"Неактивен", no_couriers:"Курьеров нет",
-            tg_id:"TG ID:", confirm_del:"Подтвердите удаление?" },
+            n_couriers:"{n} курьеров", add_title:"Новый курьер", edit_title:"Редактировать курьера",
+            lbl_name:"Имя", lbl_phone:"Телефон", lbl_tg:"Telegram ID",
+            btn_cancel:"Отмена", btn_save:"Сохранить",
+            btn_edit:"✏️ Изменить", btn_on:"⏸ Деактивировать", btn_off:"✅ Активировать", btn_del:"🗑",
+            active:"Активен", inactive:"Неактивен",
+            tg_hint:"TG ID: {id}", no_tg:"Telegram ID не указан",
+            no_couriers:"Курьеров пока нет", confirm_del:"Подтвердите удаление?" },
     };
   </script>
   <script src="/static/i18n.js"></script>

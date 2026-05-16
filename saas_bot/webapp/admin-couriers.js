@@ -1,11 +1,11 @@
-/* Admin: courier management — list, add, edit, toggle active, delete. */
+/* Admin couriers — premium redesign. */
 (() => {
   const tg = window.Telegram?.WebApp;
   if (tg) { tg.ready(); tg.expand(); }
 
   const url = new URL(window.location.href);
-  const tenantId   = url.searchParams.get("tenant") || "tenant_001";
-  const initData   = tg?.initData || "";
+  const tenantId    = url.searchParams.get("tenant") || "tenant_001";
+  const initData    = tg?.initData || "";
   const fallbackUid = parseInt(url.searchParams.get("uid") || "0") || null;
   const T = window.T;
 
@@ -31,119 +31,116 @@
   }
 
   async function load() {
-    $("loading").classList.remove("hidden");
-    $("courierList").innerHTML = "";
+    $("courierList").innerHTML = `<div class="ac-loading">${T("loading")}</div>`;
     try {
       const data = await api("GET", "/api/admin/couriers");
       const couriers = data.couriers || [];
-      $("totalSub").textContent = T("total").replace("{n}", couriers.length);
+      $("totalPill").textContent = T("n_couriers").replace("{n}", couriers.length);
       render(couriers);
     } catch (e) {
-      $("errBox").textContent = "⚠️ " + e.message;
-      $("errBox").classList.remove("hidden");
-    } finally {
-      $("loading").classList.add("hidden");
+      $("courierList").innerHTML = `<div class="ac-empty"><span class="ac-empty-icon">⚠️</span>${esc(e.message)}</div>`;
     }
   }
 
   function render(couriers) {
-    const list = $("courierList");
     if (!couriers.length) {
-      list.innerHTML = `<div class="info" style="text-align:center;padding:40px">${T("no_couriers")}</div>`;
+      $("courierList").innerHTML = `
+        <div class="ac-empty">
+          <span class="ac-empty-icon">🚗</span>
+          ${T("no_couriers")}
+        </div>`;
       return;
     }
-    list.innerHTML = couriers.map(c => {
-      const isActive = c.is_active;
-      const badge = isActive
-        ? `<span class="active-badge">${T("active")}</span>`
-        : `<span class="inactive-badge">${T("inactive")}</span>`;
-      const toggleLabel = isActive ? T("btn_deactivate") : T("btn_activate");
+    $("courierList").innerHTML = couriers.map(c => {
+      const active = !!c.is_active;
+      const stripeClass = active ? "active-stripe" : "inactive-stripe";
+      const badge = active
+        ? `<span class="ac-active-badge">${T("active")}</span>`
+        : `<span class="ac-inactive-badge">${T("inactive")}</span>`;
+      const toggleLabel = active ? T("btn_on") : T("btn_off");
+      const toggleClass = active ? "ac-btn-toggle-on" : "ac-btn-toggle-off";
+      const tgHint = c.telegram_id
+        ? `<div class="ac-tg">💬 ${T("tg_hint").replace("{id}", c.telegram_id)}</div>`
+        : `<div class="ac-tg" style="color:var(--text-muted)">💬 ${T("no_tg")}</div>`;
       return `
-        <div class="courier-card">
-          <div class="courier-card-top">
-            <div class="courier-name">${esc(c.name)}</div>
-            ${badge}
-          </div>
-          <div class="courier-phone">📞 ${esc(c.phone)}</div>
-          ${c.telegram_id ? `<div class="courier-tg">${T("tg_id")} ${c.telegram_id}</div>` : ""}
-          <div class="courier-actions">
-            <button class="c-btn c-btn-edit" onclick="openEdit(${c.id},'${esc(c.name)}','${esc(c.phone)}',${c.telegram_id || "null"})">${T("btn_edit")}</button>
-            <button class="c-btn c-btn-toggle${isActive ? "" : " inactive"}" onclick="toggleActive(${c.id})">${toggleLabel}</button>
-            <button class="c-btn c-btn-del" onclick="deleteCourier(${c.id})">${T("btn_del")}</button>
+        <div class="ac-card ${active ? "" : "inactive"}">
+          <div class="ac-card-stripe ${stripeClass}"></div>
+          <div class="ac-card-inner">
+            <div class="ac-card-row1">
+              <div class="ac-name">${esc(c.name)}</div>
+              ${badge}
+            </div>
+            <div class="ac-phone">📞 ${esc(c.phone)}</div>
+            ${tgHint}
+            <div class="ac-actions">
+              <button class="ac-btn ac-btn-edit" onclick="openEdit(${c.id},'${esc(c.name)}','${esc(c.phone)}',${c.telegram_id || "null"})">${T("btn_edit")}</button>
+              <button class="ac-btn ${toggleClass}" onclick="toggleActive(${c.id})">${toggleLabel}</button>
+              <button class="ac-btn ac-btn-del" onclick="deleteCourier(${c.id})">${T("btn_del")}</button>
+            </div>
           </div>
         </div>
       `;
     }).join("");
   }
 
+  // ── sheet open/close
   window.openAdd = () => {
     editingId = null;
-    $("modalTitle").dataset.t = "add_title";
-    $("modalTitle").textContent = T("add_title");
-    $("fName").value = "";
-    $("fPhone").value = "";
-    $("fTg").value = "";
-    $("modalBg").classList.remove("hidden");
-    $("fName").focus();
+    $("sheetTitle").textContent = T("add_title");
+    $("fName").value = $("fPhone").value = $("fTg").value = "";
+    $("sheetBg").classList.remove("hidden");
+    setTimeout(() => $("fName").focus(), 80);
   };
 
   window.openEdit = (id, name, phone, tgId) => {
     editingId = id;
-    $("modalTitle").dataset.t = "edit_title";
-    $("modalTitle").textContent = T("edit_title");
-    $("fName").value = name;
+    $("sheetTitle").textContent = T("edit_title");
+    $("fName").value  = name;
     $("fPhone").value = phone;
-    $("fTg").value = tgId || "";
-    $("modalBg").classList.remove("hidden");
-    $("fName").focus();
+    $("fTg").value    = tgId || "";
+    $("sheetBg").classList.remove("hidden");
+    setTimeout(() => $("fName").focus(), 80);
   };
 
-  window.closeModal = () => $("modalBg").classList.add("hidden");
+  window.closeSheet = () => $("sheetBg").classList.add("hidden");
 
-  window.saveModal = async () => {
-    const name  = $("fName").value.trim();
+  window.saveSheet = async () => {
+    const name = $("fName").value.trim();
     const phone = $("fPhone").value.trim();
     const tgRaw = $("fTg").value.trim();
     const telegram_id = tgRaw ? parseInt(tgRaw) : null;
-    if (!name || !phone) return;
+    if (!name || !phone) { $("fName").focus(); return; }
 
-    $("modalSaveBtn").disabled = true;
+    const btn = $("saveBtn");
+    btn.disabled = true;
     try {
       if (editingId) {
         await api("PUT", `/api/admin/couriers/${editingId}`, { name, phone, telegram_id });
       } else {
         await api("POST", "/api/admin/couriers", { name, phone, telegram_id });
       }
-      closeModal();
+      closeSheet();
       load();
     } catch (e) {
       alert(e.message);
     } finally {
-      $("modalSaveBtn").disabled = false;
+      btn.disabled = false;
     }
   };
 
-  window.toggleActive = async (id) => {
-    try {
-      await api("POST", `/api/admin/couriers/${id}/toggle`);
-      load();
-    } catch (e) {
-      alert(e.message);
-    }
+  window.toggleActive = async id => {
+    try { await api("POST", `/api/admin/couriers/${id}/toggle`); load(); }
+    catch (e) { alert(e.message); }
   };
 
-  window.deleteCourier = async (id) => {
+  window.deleteCourier = async id => {
     if (!confirm(T("confirm_del"))) return;
-    try {
-      await api("DELETE", `/api/admin/couriers/${id}`);
-      load();
-    } catch (e) {
-      alert(e.message);
-    }
+    try { await api("DELETE", `/api/admin/couriers/${id}`); load(); }
+    catch (e) { alert(e.message); }
   };
 
-  $("modalBg").addEventListener("click", e => {
-    if (e.target === $("modalBg")) closeModal();
+  $("sheetBg").addEventListener("click", e => {
+    if (e.target === $("sheetBg")) closeSheet();
   });
 
   load();
