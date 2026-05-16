@@ -1325,8 +1325,11 @@ async def api_order(payload: OrderIn) -> dict[str, Any]:
     branch_name = ""
     if payload.branch_id:
         b = await db.get_branch(payload.branch_id)
-        if b:
-            branch_name = b["name"]
+        if b is None:
+            raise HTTPException(status_code=400, detail="branch_not_found")
+        if b.get("is_open", 1) == 0:
+            raise HTTPException(status_code=400, detail="branch_closed")
+        branch_name = b["name"]
 
     user_row = await db.get_user(user_id)
     phone = (user_row or {}).get("phone", "")

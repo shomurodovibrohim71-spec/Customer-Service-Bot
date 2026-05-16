@@ -650,7 +650,7 @@ class Database:
 
     async def get_branch(self, branch_id: int) -> dict[str, Any] | None:
         async with self.conn.execute(
-            "SELECT * FROM branches WHERE id=? AND tenant_id=?",
+            "SELECT * FROM branches WHERE id=? AND tenant_id=? AND is_active=1",
             (branch_id, self.tenant_id),
         ) as cur:
             row = await cur.fetchone()

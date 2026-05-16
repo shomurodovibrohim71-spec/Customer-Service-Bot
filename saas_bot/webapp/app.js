@@ -496,6 +496,10 @@
       });
       if (!r.ok) {
         const t = await r.text();
+        let detail = "";
+        try { detail = JSON.parse(t).detail || ""; } catch (_) {}
+        if (detail === "branch_closed") throw new Error(T("err_branch_closed"));
+        if (detail === "branch_not_found") throw new Error(T("err_branch_closed"));
         throw new Error(`${T("err_server")}${r.status} ${t.slice(0, 100)}`);
       }
       const data = await r.json();

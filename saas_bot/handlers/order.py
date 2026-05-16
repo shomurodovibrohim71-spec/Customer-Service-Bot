@@ -377,8 +377,8 @@ async def delivery_method_handler(update: Update, context: ContextTypes.DEFAULT_
     if text == delivery_label:
         context.user_data["order"]["delivery_type"] = "delivery"
         context.user_data["order"]["delivery_label"] = tenant.t(lang, "delivery_label_value")
-        # Auto-pick the nearest branch to the user's address (if we have coords).
-        branches = await db.list_branches()
+        # Auto-pick the nearest open branch to the user's address (if we have coords).
+        branches = [b for b in await db.list_branches() if b.get("is_open", 1) != 0]
         user_lat = context.user_data["order"].get("address_lat")
         user_lon = context.user_data["order"].get("address_lon")
         nearest = nearest_branches(branches, user_lat, user_lon, limit=1) if branches else []
@@ -391,7 +391,7 @@ async def delivery_method_handler(update: Update, context: ContextTypes.DEFAULT_
                 parse_mode=ParseMode.MARKDOWN,
             )
         elif branches:
-            # No coords - pick the first listed branch as default.
+            # No coords - pick the first open branch as default.
             b = branches[0]
             context.user_data["order"]["branch"] = b["name"]
             context.user_data["order"]["branch_id"] = b["id"]
@@ -466,7 +466,8 @@ async def pickup_branch_handler(update: Update, context: ContextTypes.DEFAULT_TY
     except (ValueError, IndexError):
         return PICKUP_BRANCH
     branch = await db.get_branch(bid)
-    if branch is None:
+    if branch is None or branch.get("is_open", 1) == 0:
+        await query.answer(tenant.t(lang, "branch_closed_msg"), show_alert=True)
         return PICKUP_BRANCH
     context.user_data["order"]["branch"] = branch["name"]
     context.user_data["order"]["branch_id"] = branch["id"]

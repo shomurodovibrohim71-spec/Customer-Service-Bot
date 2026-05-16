@@ -255,6 +255,7 @@ TEXTS = {
         "btn_pickup":            "🚶 Olib ketish",
         "pickup_ask_branch":     "🏪 Qaysi filialdan olib ketasiz?",
         "pickup_branch_set":     "✅ Filial: *{branch}*",
+        "branch_closed_msg":     "🚫 Bu filial hozir yopiq. Boshqa filial tanlang.",
         "delivery_label_value":  "Yetkazib berish",
         "pickup_label_value":    "Olib ketish",
         # Reverse-geocoded confirm
@@ -341,6 +342,7 @@ TEXTS = {
         'btn_pickup': '🚶 Pickup',
         'pickup_ask_branch': '🏪 From which branch?',
         'pickup_branch_set': '✅ Branch: *{branch}*',
+        'branch_closed_msg': '🚫 This branch is currently closed. Please select another.',
         'delivery_label_value': 'Delivery',
         'pickup_label_value': 'Pickup',
         'geo_address_confirm': '📍 Your address: *{address}*\n\nIs this correct?',
@@ -470,6 +472,7 @@ TEXTS = {
         "btn_pickup":            "🚶 Самовывоз",
         "pickup_ask_branch":     "🏪 Из какого филиала?",
         "pickup_branch_set":     "✅ Филиал: *{branch}*",
+        "branch_closed_msg":     "🚫 Этот филиал сейчас закрыт. Выберите другой филиал.",
         "delivery_label_value":  "Доставка",
         "pickup_label_value":    "Самовывоз",
         "geo_address_confirm": "📍 Ваш адрес: *{address}*\n\nВерно?",
