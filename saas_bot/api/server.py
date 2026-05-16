@@ -554,11 +554,21 @@ async def api_menu(tenant_id: str = Query(..., alias="tenant")) -> dict[str, Any
         upsell_cats = _json.loads(settings.get("upsell.categories", "null") or "null") or _default_upsell
     except Exception:
         upsell_cats = _default_upsell
+    # Build upsell_products: only the configured categories, server-side filtered.
+    # This means even old client code that iterates state.menu.products
+    # will only see upsell-allowed categories if it uses upsell_products.
+    upsell_products = {
+        cat: grouped[cat]
+        for cat in upsell_cats
+        if cat in grouped
+    }
     return {
         "tenant_id": tenant_id,
         "tenant_name": tenant.name,
         "categories": list(grouped.keys()),
         "products": grouped,
+        "upsell_products": upsell_products,
+        "upsell_categories": list(upsell_products.keys()),
         "branches": [
             {"id": b["id"], "name": b["name"], "address": b.get("address", ""),
              "lat": b.get("lat"), "lon": b.get("lon")}
@@ -568,7 +578,6 @@ async def api_menu(tenant_id: str = Query(..., alias="tenant")) -> dict[str, Any
         "min_order": int(tenant.config.get("min_order", 0)),
         "delivery_fee_base": int(tenant.config.get("delivery_fee_base", 0)),
         "delivery_free_from": int(tenant.config.get("delivery_free_from", 0)),
-        "upsell_categories": upsell_cats,
     }
 
 
