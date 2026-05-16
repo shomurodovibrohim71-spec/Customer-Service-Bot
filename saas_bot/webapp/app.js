@@ -295,22 +295,14 @@
     $("cartSumTotal").textContent = fmt(cartTotal());
   }
 
-  // Category priority for upsell chips (categories shown first)
-  const UPSELL_PRIORITY = [
-    "🥤 Ichimliklar", "🥗 Salatlar", "🥟 Somsa", "🍮 Shirinliklar",
-    "🍲 Sho'rvalar", "🍚 Plov", "🥩 Kabob",
-  ];
-
   // Track which upsell chip is selected
   const upsellState = { activeChip: null };
 
   function upsellCats() {
     if (!state.menu?.products) return [];
-    const all = [
-      ...UPSELL_PRIORITY.filter(c => state.menu.products[c]?.length),
-      ...Object.keys(state.menu.products).filter(c => !UPSELL_PRIORITY.includes(c) && state.menu.products[c]?.length),
-    ];
-    return all;
+    // Only show categories that admin marked as upsell AND have products in stock
+    const allowed = state.menu.upsell_categories || [];
+    return allowed.filter(c => state.menu.products[c]?.some(p => p.in_stock !== 0));
   }
 
   function renderUpsellProducts(cat) {

@@ -187,11 +187,52 @@
       list.innerHTML = "";
       if (!data.categories.length) {
         list.innerHTML = `<div class="info">${T("cats_empty")}</div>`;
-        return;
+      } else {
+        data.categories.forEach(c => list.appendChild(catRow(c)));
       }
-      data.categories.forEach(c => list.appendChild(catRow(c)));
     } catch (e) {
       list.innerHTML = `<div class="err">⚠️ ${escapeHtml(e.message)}</div>`;
+    }
+    // Also load upsell toggles whenever cats screen opens
+    loadUpsellCats();
+  }
+
+  // ── upsell category toggles
+  async function loadUpsellCats() {
+    const container = $("upsellCatsList");
+    if (!container) return;
+    container.innerHTML = `<div class="loading" style="font-size:13px">${T("loading")}</div>`;
+    try {
+      const data = await api("GET", "/api/admin/upsell-categories");
+      const current = new Set(data.upsell_categories || []);
+      const all = data.all_categories || [];
+      container.innerHTML = "";
+      all.forEach(cat => {
+        const checked = current.has(cat);
+        const row = document.createElement("div");
+        row.className = "upsell-row";
+        row.innerHTML = `
+          <span class="upsell-row-name">${escapeHtml(cat)}</span>
+          <label class="upsell-toggle">
+            <input type="checkbox" data-cat="${escapeHtml(cat)}" ${checked ? "checked" : ""}>
+            <span class="upsell-slider"></span>
+          </label>`;
+        row.querySelector("input").onchange = () => saveUpsellCats();
+        container.appendChild(row);
+      });
+      if (!all.length) container.innerHTML = `<div class="info" style="font-size:13px">—</div>`;
+    } catch (e) {
+      container.innerHTML = `<div class="err" style="font-size:13px">⚠️ ${escapeHtml(e.message)}</div>`;
+    }
+  }
+
+  async function saveUpsellCats() {
+    const checked = [...document.querySelectorAll("#upsellCatsList input[type=checkbox]:checked")]
+      .map(el => el.dataset.cat);
+    try {
+      await api("POST", "/api/admin/upsell-categories", { categories: checked });
+    } catch (e) {
+      alert(e.message);
     }
   }
 

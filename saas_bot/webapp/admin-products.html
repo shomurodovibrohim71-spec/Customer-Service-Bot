@@ -8,6 +8,16 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <link rel="stylesheet" href="/static/styles.css">
   <style>
+    /* upsell toggle row */
+    .upsell-row { display: flex; align-items: center; justify-content: space-between; background: var(--card, #1f232d); border-radius: 12px; padding: 11px 14px; }
+    .upsell-row-name { font-size: 14px; color: var(--text, #f5f7fb); }
+    .upsell-toggle { position: relative; width: 44px; height: 24px; flex-shrink: 0; }
+    .upsell-toggle input { opacity: 0; width: 0; height: 0; }
+    .upsell-slider { position: absolute; inset: 0; background: rgba(255,255,255,0.1); border-radius: 999px; cursor: pointer; transition: background .2s; }
+    .upsell-toggle input:checked + .upsell-slider { background: #ff7a18; }
+    .upsell-slider::before { content: ""; position: absolute; width: 18px; height: 18px; border-radius: 50%; background: #fff; left: 3px; top: 3px; transition: transform .2s; }
+    .upsell-toggle input:checked + .upsell-slider::before { transform: translateX(20px); }
+
     .admin-prod-card.out-of-stock { opacity: 0.6; }
     .stock-toggle-btn {
       margin-top: 6px; padding: 4px 10px; border-radius: 20px;
@@ -48,6 +58,13 @@
       <div class="info" data-t="cat_warn">Toifani o'chirsangiz, undagi BARCHA mahsulotlar ham o'chiriladi.</div>
       <div id="catsList" class="cats-list"></div>
       <div id="catsErr" class="err hidden"></div>
+
+      <!-- Upsell section -->
+      <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--line)">
+        <div style="font-weight:700;font-size:15px;margin-bottom:4px" data-t="upsell_title">➕ Savatcha qo'shimchalari</div>
+        <div class="info" data-t="upsell_hint" style="margin-bottom:10px">Qaysi toifalar savatchada "Qo'shish" bo'limida ko'rinishini belgilang.</div>
+        <div id="upsellCatsList" style="display:flex;flex-direction:column;gap:6px"></div>
+      </div>
     </div>
   </section>
 
@@ -91,6 +108,9 @@
         err_name: "Nom kerak", err_cat_req: "Toifa kerak", err_price: "Narx 0 dan katta bo'lsin",
         soum: "so'm", cnt_suffix: "ta",
         stock_in: "✅ Bor", stock_out: "❌ Tugadi",
+        upsell_title: "➕ Savatcha qo'shimchalari",
+        upsell_hint: "Qaysi toifalar savatchada \"Qo'shish\" bo'limida ko'rinishini belgilang.",
+        upsell_on: "Qo'shimchada ko'rsatish",
       },
       en: {
         page_title: "📦 Products", add_product: "➕ New product", manage_cats: "🗂 Categories",
@@ -110,6 +130,9 @@
         err_name: "Name required", err_cat_req: "Category required", err_price: "Price must be > 0",
         soum: "so'm", cnt_suffix: "pcs",
         stock_in: "✅ In stock", stock_out: "❌ Out of stock",
+        upsell_title: "➕ Cart add-ons",
+        upsell_hint: "Choose which categories appear in the cart upsell section.",
+        upsell_on: "Show in add-ons",
       },
       ru: {
         page_title: "📦 Товары", add_product: "➕ Новый товар", manage_cats: "🗂 Категории",
@@ -129,6 +152,9 @@
         err_name: "Введите название", err_cat_req: "Выберите категорию", err_price: "Цена должна быть > 0",
         soum: "сум", cnt_suffix: "шт",
         stock_in: "✅ В наличии", stock_out: "❌ Нет в наличии",
+        upsell_title: "➕ Доп. к заказу",
+        upsell_hint: "Выберите категории, которые показываются в разделе «добавить к заказу» в корзине.",
+        upsell_on: "Показывать в допах",
       },
     };
   </script>

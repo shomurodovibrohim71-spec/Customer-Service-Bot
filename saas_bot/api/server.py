@@ -563,6 +563,13 @@ async def api_menu(tenant_id: str = Query(..., alias="tenant")) -> dict[str, Any
         })
     settings = await db.all_settings()
     card_number = settings.get("company.card_number", "").strip()
+    # upsell_categories: admin-configured list; default to drinks/salads/desserts
+    import json as _json
+    _default_upsell = ["🥤 Ichimliklar", "🥗 Salatlar", "🍮 Shirinliklar"]
+    try:
+        upsell_cats = _json.loads(settings.get("upsell.categories", "null") or "null") or _default_upsell
+    except Exception:
+        upsell_cats = _default_upsell
     return {
         "tenant_id": tenant_id,
         "tenant_name": tenant.name,
@@ -577,6 +584,7 @@ async def api_menu(tenant_id: str = Query(..., alias="tenant")) -> dict[str, Any
         "min_order": int(tenant.config.get("min_order", 0)),
         "delivery_fee_base": int(tenant.config.get("delivery_fee_base", 0)),
         "delivery_free_from": int(tenant.config.get("delivery_free_from", 0)),
+        "upsell_categories": upsell_cats,
     }
 
 
@@ -1680,6 +1688,43 @@ async def tenant_stats(tenant_id: str):
         "messages": await db.message_stats(),
         "orders": await db.count_orders_by_status(),
     }
+
+
+# ============================================================ Upsell categories
+
+@app.get("/api/admin/upsell-categories")
+async def api_get_upsell_categories(
+    tenant: str, init_data: str = "", uid: int | None = None,
+) -> dict[str, Any]:
+    import json as _json
+    t = get_tenant(tenant)
+    _check_admin(t, init_data, uid)
+    db = get_db(tenant)
+    settings = await db.all_settings()
+    all_cats = [r["name"] for r in await db.list_categories()]
+    _default = ["🥤 Ichimliklar", "🥗 Salatlar", "🍮 Shirinliklar"]
+    try:
+        current = _json.loads(settings.get("upsell.categories", "null") or "null") or _default
+    except Exception:
+        current = _default
+    return {"all_categories": all_cats, "upsell_categories": current}
+
+
+class UpsellCatsIn(BaseModel):
+    categories: list[str]
+
+
+@app.post("/api/admin/upsell-categories")
+async def api_set_upsell_categories(
+    body: UpsellCatsIn,
+    tenant: str, init_data: str = "", uid: int | None = None,
+) -> dict[str, Any]:
+    import json as _json
+    t = get_tenant(tenant)
+    _check_admin(t, init_data, uid)
+    db = get_db(tenant)
+    await db.set_setting("upsell.categories", _json.dumps(body.categories, ensure_ascii=False))
+    return {"ok": True, "upsell_categories": body.categories}
 
 
 # ============================================================ Couriers API
