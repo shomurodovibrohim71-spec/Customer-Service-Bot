@@ -5,10 +5,11 @@ import asyncio
 import logging
 import signal
 import sys
+from datetime import time as dt_time
 from pathlib import Path
 
 from telegram.error import TelegramError
-from telegram.ext import Application, ApplicationBuilder
+from telegram.ext import Application, ApplicationBuilder, CallbackContext
 
 from config.settings import BASE_DIR, LOG_LEVEL
 from core.ai import AIClient
@@ -77,6 +78,16 @@ async def build_application(tenant: Tenant, ai: AIClient) -> tuple[Application, 
     chat_handler.register(app)                 # AI catch-all (group=10)
 
     app.add_error_handler(_error_handler)
+
+    # Schedule daily report at 23:00 local time (Tashkent UTC+5).
+    if app.job_queue is not None:
+        app.job_queue.run_daily(
+            _daily_report_job,
+            time=dt_time(18, 0, 0),  # 18:00 UTC = 23:00 Tashkent (UTC+5)
+            name=f"daily_report_{tenant.id}",
+        )
+        logger.info("[%s] Daily report scheduled at 23:00 Tashkent", tenant.id)
+
     return app, db
 
 
@@ -84,6 +95,49 @@ async def _error_handler(update, context) -> None:
     tenant = context.bot_data.get("tenant")
     tag = tenant.id if tenant else "?"
     logger.error("[%s] Update %s caused error: %s", tag, update, context.error)
+
+
+async def _daily_report_job(context: CallbackContext) -> None:
+    """Sends a daily summary to all admin_ids at 23:00."""
+    tenant: Tenant = context.bot_data["tenant"]
+    db: Database = context.bot_data["db"]
+    try:
+        s = await db.today_summary()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("[%s] daily_report: db error: %s", tenant.id, exc)
+        return
+
+    top_lines = "\n".join(
+        f"  {i+1}. {t['name']} — {t['count']} ta" for i, t in enumerate(s.get("top", []))
+    ) or "  —"
+
+    revenue = s["revenue"]
+    rev_fmt = f"{revenue:,}".replace(",", " ")
+    msg = (
+        f"📊 *Kunlik hisobot — {_today_date()}*\n\n"
+        f"📦 Jami buyurtma: *{s['total']} ta*\n"
+        f"💰 Tushum: *{rev_fmt} so'm*\n\n"
+        f"✅ Tasdiqlangan: {s['confirmed']}\n"
+        f"👨‍🍳 Tayyorlanmoqda: {s['preparing']}\n"
+        f"🚗 Yo'lda: {s['on_the_way']}\n"
+        f"📦 Yetkazilgan: {s['delivered']}\n"
+        f"⏳ Kutilmoqda: {s['pending']}\n"
+        f"❌ Bekor: {s['cancelled']}\n\n"
+        f"🏆 *Top taomlar:*\n{top_lines}"
+    )
+
+    for admin_id in tenant.admin_ids:
+        try:
+            await context.bot.send_message(
+                chat_id=admin_id, text=msg, parse_mode="Markdown",
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("[%s] daily_report: send to %s failed: %s", tenant.id, admin_id, exc)
+
+
+def _today_date() -> str:
+    from datetime import date
+    return date.today().strftime("%d.%m.%Y")
 
 
 async def run_tenant(tenant: Tenant, ai: AIClient) -> None:

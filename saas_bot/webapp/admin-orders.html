@@ -89,10 +89,12 @@
       position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
       border-radius: var(--r-lg) 0 0 var(--r-lg);
     }
-    .stripe-pending   { background: var(--warning); }
-    .stripe-confirmed { background: #4ade80; }
-    .stripe-delivered { background: var(--accent); }
-    .stripe-cancelled { background: var(--danger); }
+    .stripe-pending    { background: var(--warning); }
+    .stripe-confirmed  { background: #4ade80; }
+    .stripe-preparing  { background: #f59e0b; }
+    .stripe-on_the_way { background: #a78bfa; }
+    .stripe-delivered  { background: var(--accent); }
+    .stripe-cancelled  { background: var(--danger); }
 
     .ao-card-inner { padding: 14px 14px 14px 18px; display: flex; flex-direction: column; gap: 8px; }
 
@@ -108,10 +110,12 @@
       font-size: 11px; font-weight: 700; padding: 3px 10px;
       border-radius: var(--r-pill); white-space: nowrap; flex-shrink: 0;
     }
-    .st-pending   { background: rgba(255,176,32,0.18); color: var(--warning); }
-    .st-confirmed { background: rgba(74,222,128,0.18); color: #4ade80; }
-    .st-delivered { background: rgba(106,203,255,0.18); color: var(--accent); }
-    .st-cancelled { background: rgba(255,93,93,0.18); color: var(--danger); }
+    .st-pending    { background: rgba(255,176,32,0.18); color: var(--warning); }
+    .st-confirmed  { background: rgba(74,222,128,0.18); color: #4ade80; }
+    .st-preparing  { background: rgba(245,158,11,0.18); color: #f59e0b; }
+    .st-on_the_way { background: rgba(167,139,250,0.18); color: #a78bfa; }
+    .st-delivered  { background: rgba(106,203,255,0.18); color: var(--accent); }
+    .st-cancelled  { background: rgba(255,93,93,0.18); color: var(--danger); }
 
     .ao-card-user {
       display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
@@ -170,9 +174,11 @@
       transition: filter .15s, transform .1s;
     }
     .ao-qa-btn:active { filter: brightness(0.88); transform: scale(0.98); }
-    .ao-qa-confirm  { background: rgba(74,222,128,0.18); color: #4ade80; }
-    .ao-qa-deliver  { background: rgba(106,203,255,0.18); color: var(--accent); }
-    .ao-qa-cancel   { background: rgba(255,93,93,0.14); color: var(--danger); }
+    .ao-qa-confirm   { background: rgba(74,222,128,0.18); color: #4ade80; }
+    .ao-qa-prepare   { background: rgba(245,158,11,0.18); color: #f59e0b; }
+    .ao-qa-on-way    { background: rgba(167,139,250,0.18); color: #a78bfa; }
+    .ao-qa-deliver   { background: rgba(106,203,255,0.18); color: var(--accent); }
+    .ao-qa-cancel    { background: rgba(255,93,93,0.14); color: var(--danger); }
 
     /* Detail screen */
     .ao-detail-content { padding: 14px 14px 100px; display: flex; flex-direction: column; gap: 12px; }
@@ -292,8 +298,10 @@
         lbl_promo: "Promokod", lbl_placed: "Vaqt", lbl_delivery: "Usul",
         pay_cash: "💵 Naqd", pay_card: "💳 Karta",
         status_pending: "⏳ Kutilmoqda", status_confirmed: "✅ Tasdiqlangan",
+        status_preparing: "👨‍🍳 Tayyorlanmoqda", status_on_the_way: "🚗 Yo'lda",
         status_delivered: "📦 Yetkazilgan", status_cancelled: "❌ Bekor qilingan",
-        act_confirm: "✅ Tasdiqlash", act_delivered: "📦 Yetkazildi", act_cancel: "❌ Bekor qilish",
+        act_confirm: "✅ Tasdiqlash", act_prepare: "👨‍🍳 Tayyorlanmoqda",
+        act_on_way: "🚗 Yo'lda", act_delivered: "📦 Yetkazildi", act_cancel: "❌ Bekor qilish",
         confirm_cancel: "Buyurtma #{id} bekor qilinsinmi?",
         soum: "so'm", x_qty: "× {q}", updated: "✅ Yangilandi", view_details: "Batafsil →",
         lbl_note_courier: "🚗 Kuryerga", lbl_note_rest: "🍴 Restoranga",
@@ -311,8 +319,10 @@
         lbl_promo: "Promo", lbl_placed: "Placed", lbl_delivery: "Method",
         pay_cash: "💵 Cash", pay_card: "💳 Card",
         status_pending: "⏳ Pending", status_confirmed: "✅ Confirmed",
+        status_preparing: "👨‍🍳 Preparing", status_on_the_way: "🚗 On the way",
         status_delivered: "📦 Delivered", status_cancelled: "❌ Cancelled",
-        act_confirm: "✅ Confirm", act_delivered: "📦 Mark delivered", act_cancel: "❌ Cancel",
+        act_confirm: "✅ Confirm", act_prepare: "👨‍🍳 Preparing",
+        act_on_way: "🚗 On the way", act_delivered: "📦 Mark delivered", act_cancel: "❌ Cancel",
         confirm_cancel: "Cancel order #{id}?",
         soum: "so'm", x_qty: "× {q}", updated: "✅ Updated", view_details: "Details →",
         lbl_note_courier: "🚗 For courier", lbl_note_rest: "🍴 For restaurant",
@@ -330,8 +340,10 @@
         lbl_promo: "Промокод", lbl_placed: "Время", lbl_delivery: "Способ",
         pay_cash: "💵 Наличные", pay_card: "💳 Карта",
         status_pending: "⏳ В ожидании", status_confirmed: "✅ Подтверждён",
+        status_preparing: "👨‍🍳 Готовится", status_on_the_way: "🚗 В пути",
         status_delivered: "📦 Доставлен", status_cancelled: "❌ Отменён",
-        act_confirm: "✅ Подтвердить", act_delivered: "📦 Доставлен", act_cancel: "❌ Отменить",
+        act_confirm: "✅ Подтвердить", act_prepare: "👨‍🍳 Готовится",
+        act_on_way: "🚗 В пути", act_delivered: "📦 Доставлен", act_cancel: "❌ Отменить",
         confirm_cancel: "Отменить заказ #{id}?",
         soum: "сум", x_qty: "× {q}", updated: "✅ Обновлено", view_details: "Детали →",
         lbl_note_courier: "🚗 Курьеру", lbl_note_rest: "🍴 Ресторану",

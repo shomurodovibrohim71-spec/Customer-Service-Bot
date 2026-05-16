@@ -271,6 +271,18 @@ async def api_admin_products_delete(product_id: int, payload: AdminQuery) -> dic
     return {"ok": ok}
 
 
+@app.post("/api/admin/products/{product_id}/toggle-stock")
+async def api_admin_products_toggle_stock(product_id: int, payload: AdminQuery) -> dict[str, Any]:
+    """Toggle product in_stock (available ↔ out of stock)."""
+    t = get_tenant(payload.tenant_id)
+    _check_admin(t, payload.init_data, payload.fallback_uid)
+    db = get_db(payload.tenant_id)
+    new_val = await db.toggle_product_stock(product_id)
+    if new_val is None:
+        raise HTTPException(status_code=404, detail="product not found")
+    return {"ok": True, "in_stock": new_val}
+
+
 @app.get("/api/admin/categories")
 async def api_admin_categories(
     tenant: str, init_data: str = "", uid: int | None = None,
@@ -468,6 +480,43 @@ def _resolve_tenant_by_token_from_init(init_data_str: str) -> Tenant | None:
     return None
 
 
+def _calc_delivery_fee(tenant: Tenant, subtotal: int, distance_km: float | None) -> int:
+    """Return delivery fee in so'm based on tenant config and distance."""
+    cfg = tenant.config
+    min_order = int(cfg.get("min_order", 0))
+    base_fee = int(cfg.get("delivery_fee_base", 0))
+    per_km = int(cfg.get("delivery_fee_per_km", 0))
+    free_km = float(cfg.get("delivery_free_km", 0))
+    free_from = int(cfg.get("delivery_free_from", 0))
+    if free_from > 0 and subtotal >= free_from:
+        return 0
+    if base_fee == 0:
+        return 0
+    fee = base_fee
+    if distance_km is not None and per_km > 0 and distance_km > free_km:
+        fee += int((distance_km - free_km) * per_km)
+    return fee
+
+
+@app.get("/api/delivery-fee")
+async def api_delivery_fee(
+    tenant_id: str = Query(..., alias="tenant"),
+    distance_km: float = Query(0.0),
+    subtotal: int = Query(0),
+) -> dict[str, Any]:
+    """Return delivery fee for given subtotal and distance."""
+    t = get_tenant(tenant_id)
+    fee = _calc_delivery_fee(t, subtotal, distance_km if distance_km > 0 else None)
+    min_order = int(t.config.get("min_order", 0))
+    free_from = int(t.config.get("delivery_free_from", 0))
+    return {
+        "fee": fee,
+        "min_order": min_order,
+        "free_from": free_from,
+        "free_from_met": free_from > 0 and subtotal >= free_from,
+    }
+
+
 @app.get("/api/reverse-geocode")
 async def api_reverse_geocode(
     lat: float = Query(...),
@@ -500,6 +549,7 @@ async def api_menu(tenant_id: str = Query(..., alias="tenant")) -> dict[str, Any
             "price_value": int(p.get("price_value") or 0),
             "description": p.get("description") or "",
             "image_url": p.get("image_url") or "",
+            "in_stock": int(p.get("in_stock", 1)),
         })
     settings = await db.all_settings()
     card_number = settings.get("company.card_number", "").strip()
@@ -514,6 +564,9 @@ async def api_menu(tenant_id: str = Query(..., alias="tenant")) -> dict[str, Any
             for b in branches if b.get("is_open", 1) != 0
         ],
         "card_number": card_number,
+        "min_order": int(tenant.config.get("min_order", 0)),
+        "delivery_fee_base": int(tenant.config.get("delivery_fee_base", 0)),
+        "delivery_free_from": int(tenant.config.get("delivery_free_from", 0)),
     }
 
 
@@ -535,6 +588,7 @@ class OrderIn(BaseModel):
     items: list[OrderItem]
     payment_method: str = "cash"  # 'cash' | 'card'
     promo_code: str = ""
+    address_distance_km: float | None = None  # distance from nearest branch (for delivery fee)
     # Building details + notes (Mini Food-style checkout)
     note: str = ""           # restaurant note (e.g. "less mayo")
     courier_note: str = ""   # courier note (e.g. "leave at door")
@@ -1116,7 +1170,8 @@ async def api_admin_orders_status(payload: AdminOrderStatusIn) -> dict[str, Any]
     """Admin updates an order's status. Notifies the customer in their language."""
     t = get_tenant(payload.tenant_id)
     _check_admin(t, payload.init_data, payload.fallback_uid)
-    if payload.status not in ("pending", "confirmed", "delivered", "cancelled"):
+    allowed = ("pending", "confirmed", "preparing", "on_the_way", "delivered", "cancelled")
+    if payload.status not in allowed:
         raise HTTPException(status_code=400, detail="bad status")
     db = get_db(payload.tenant_id)
     order = await db.get_order(payload.order_id)
@@ -1125,16 +1180,27 @@ async def api_admin_orders_status(payload: AdminOrderStatusIn) -> dict[str, Any]
     await db.set_order_status(payload.order_id, payload.status)
 
     # Notify customer in their language (skip for 'pending').
+    notify_msgs: dict[str, dict[str, str]] = {}
     if payload.status != "pending":
         u = await db.get_user(int(order["user_id"]))
         cust_lang = (u or {}).get("language") or t.default_language
         amount = int(order.get("amount") or 0)
         oid = payload.order_id
-        msg = {
+        notify_msgs = {
             "confirmed": {
                 "uz": f"✅ Buyurtmangiz #{oid} tasdiqlandi! 💰 Summa: {amount:,} so'm\nTez orada bog'lanamiz 🚗",
                 "en": f"✅ Your order #{oid} is confirmed! 💰 Amount: {amount:,} so'm\nWe'll be in touch soon 🚗",
                 "ru": f"✅ Ваш заказ #{oid} подтверждён! 💰 Сумма: {amount:,} сум\nСкоро свяжемся 🚗",
+            },
+            "preparing": {
+                "uz": f"👨‍🍳 Buyurtmangiz #{oid} tayyorlanmoqda! Biroz sabr qiling 🙏",
+                "en": f"👨‍🍳 Your order #{oid} is being prepared! Please wait a moment 🙏",
+                "ru": f"👨‍🍳 Ваш заказ #{oid} готовится! Немного подождите 🙏",
+            },
+            "on_the_way": {
+                "uz": f"🚗 Buyurtmangiz #{oid} yo'lda! Kuryer sizga yetib bormoqda 📍",
+                "en": f"🚗 Your order #{oid} is on the way! The courier is heading to you 📍",
+                "ru": f"🚗 Ваш заказ #{oid} в пути! Курьер уже едет к вам 📍",
             },
             "delivered": {
                 "uz": f"📦 Buyurtmangiz #{oid} yetkazildi! Yaxshi ovqatlanishingizni tilaymiz 🍔",
@@ -1146,15 +1212,17 @@ async def api_admin_orders_status(payload: AdminOrderStatusIn) -> dict[str, Any]
                 "en": f"❌ Your order #{oid} has been cancelled.\nPlease place a new order.",
                 "ru": f"❌ Ваш заказ #{oid} отменён.\nПожалуйста, оформите заказ снова.",
             },
-        }[payload.status].get(cust_lang)
-        try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                await client.post(
-                    f"https://api.telegram.org/bot{t.bot_token}/sendMessage",
-                    json={"chat_id": int(order["user_id"]), "text": msg},
-                )
-        except httpx.HTTPError as exc:
-            logger.warning("[%s] order status notify failed: %s", t.id, exc)
+        }
+        msg = notify_msgs.get(payload.status, {}).get(cust_lang)
+        if msg:
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    await client.post(
+                        f"https://api.telegram.org/bot{t.bot_token}/sendMessage",
+                        json={"chat_id": int(order["user_id"]), "text": msg},
+                    )
+            except httpx.HTTPError as exc:
+                logger.warning("[%s] order status notify failed: %s", t.id, exc)
     return {"ok": True}
 
 
@@ -1311,6 +1379,11 @@ async def api_order(payload: OrderIn) -> dict[str, Any]:
     if not lines:
         raise HTTPException(status_code=400, detail="empty cart")
 
+    # Validate minimum order amount.
+    min_order = int(tenant.config.get("min_order", 0))
+    if min_order > 0 and subtotal < min_order:
+        raise HTTPException(status_code=400, detail=f"min_order:{min_order}")
+
     # Apply promo code (if any).
     discount = 0
     applied_code = ""
@@ -1320,7 +1393,12 @@ async def api_order(payload: OrderIn) -> dict[str, Any]:
         if not ok:
             raise HTTPException(status_code=400, detail=f"promo: {_label}")
         applied_code = (promo or {}).get("code", "")
-    total = max(0, subtotal - discount)
+
+    # Add delivery fee for delivery orders.
+    delivery_fee = 0
+    if payload.delivery_type == "delivery":
+        delivery_fee = _calc_delivery_fee(tenant, subtotal, payload.address_distance_km)
+    total = max(0, subtotal + delivery_fee - discount)
 
     branch_name = ""
     if payload.branch_id:

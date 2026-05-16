@@ -7,6 +7,17 @@
   <title>Products</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <link rel="stylesheet" href="/static/styles.css">
+  <style>
+    .admin-prod-card.out-of-stock { opacity: 0.6; }
+    .stock-toggle-btn {
+      margin-top: 6px; padding: 4px 10px; border-radius: 20px;
+      font-size: 11px; font-weight: 700; border: none; cursor: pointer;
+      transition: filter .15s;
+    }
+    .stock-toggle-btn:active { filter: brightness(0.85); }
+    .stock-badge.in  { background: rgba(74,222,128,0.18); color: #4ade80; }
+    .stock-badge.out { background: rgba(255,93,93,0.15); color: #f87171; }
+  </style>
 </head>
 <body>
   <header class="topbar">
@@ -79,6 +90,7 @@
         err_prefix: "Xato: ", err_cat_name: "Toifa nomini kiriting",
         err_name: "Nom kerak", err_cat_req: "Toifa kerak", err_price: "Narx 0 dan katta bo'lsin",
         soum: "so'm", cnt_suffix: "ta",
+        stock_in: "✅ Bor", stock_out: "❌ Tugadi",
       },
       en: {
         page_title: "📦 Products", add_product: "➕ New product", manage_cats: "🗂 Categories",
@@ -97,6 +109,7 @@
         err_prefix: "Error: ", err_cat_name: "Enter category name",
         err_name: "Name required", err_cat_req: "Category required", err_price: "Price must be > 0",
         soum: "so'm", cnt_suffix: "pcs",
+        stock_in: "✅ In stock", stock_out: "❌ Out of stock",
       },
       ru: {
         page_title: "📦 Товары", add_product: "➕ Новый товар", manage_cats: "🗂 Категории",
@@ -115,6 +128,7 @@
         err_prefix: "Ошибка: ", err_cat_name: "Введите название категории",
         err_name: "Введите название", err_cat_req: "Выберите категорию", err_price: "Цена должна быть > 0",
         soum: "сум", cnt_suffix: "шт",
+        stock_in: "✅ В наличии", stock_out: "❌ Нет в наличии",
       },
     };
   </script>

@@ -184,6 +184,13 @@
   }
 
   function _productActionEl(p) {
+    if (p.in_stock === 0) {
+      const outBtn = document.createElement("button");
+      outBtn.className = "add-btn out-of-stock-btn";
+      outBtn.textContent = T("out_of_stock");
+      outBtn.disabled = true;
+      return outBtn;
+    }
     const qty = state.cart[p.id] || 0;
     if (qty === 0) {
       const addBtn = document.createElement("button");
@@ -216,13 +223,20 @@
   }
 
   function productCard(p) {
+    const outOfStock = p.in_stock === 0;
     const card = document.createElement("div");
-    card.className = "product-card";
+    card.className = "product-card" + (outOfStock ? " product-out-of-stock" : "");
     card.dataset.pid = p.id;
 
     const img = document.createElement("div");
     img.className = "product-img";
     if (p.image_url) img.style.backgroundImage = `url(${p.image_url})`;
+    if (outOfStock) {
+      const badge = document.createElement("div");
+      badge.className = "out-of-stock-badge";
+      badge.textContent = T("out_of_stock");
+      img.appendChild(badge);
+    }
     card.appendChild(img);
 
     const info = document.createElement("div");
@@ -288,6 +302,16 @@
   $("cartBack").onclick = () => closeScreen("cartScreen");
 
   // ----- Checkout --------------------------------------------------------
+  function calcDeliveryFee(subtotal) {
+    if (state.deliveryType !== "delivery") return 0;
+    const m = state.menu || {};
+    const freeFrom = m.delivery_free_from || 0;
+    const baseFee  = m.delivery_fee_base  || 0;
+    if (!baseFee) return 0;
+    if (freeFrom > 0 && subtotal >= freeFrom) return 0;
+    return baseFee;
+  }
+
   function refreshCheckoutTotals() {
     const subtotal = cartTotal();
     $("checkoutSubtotal").textContent = fmt(subtotal);
@@ -298,7 +322,18 @@
     } else {
       $("checkoutDiscountRow").classList.add("hidden");
     }
-    $("checkoutTotal").textContent = fmt(Math.max(0, subtotal - disc));
+    const fee = calcDeliveryFee(subtotal);
+    const feeRow = $("checkoutDeliveryFeeRow");
+    if (feeRow) {
+      if (fee > 0) {
+        feeRow.classList.remove("hidden");
+        const feeEl = $("checkoutDeliveryFee");
+        if (feeEl) feeEl.textContent = "+ " + fmt(fee);
+      } else {
+        feeRow.classList.add("hidden");
+      }
+    }
+    $("checkoutTotal").textContent = fmt(Math.max(0, subtotal + fee - disc));
   }
   $("checkoutBtn").onclick = () => {
     if (cartCount() === 0) return;
@@ -413,6 +448,11 @@
     if (state.deliveryType === "delivery" && !addr) { showErr(T("err_addr")); return; }
     const finalTime = time || "—";
     if (cartCount() === 0) { showErr(T("err_cart_empty")); return; }
+    const minOrder = state.menu?.min_order || 0;
+    if (minOrder > 0 && cartTotal() < minOrder) {
+      showErr(tfmt("err_min_order", { min: fmt(minOrder) }));
+      return;
+    }
     if (!initData && !fallbackUid) {
       showErr(T("err_no_init"));
       return;
@@ -447,6 +487,7 @@
       address: addr,
       address_lat: state.addressLat,
       address_lon: state.addressLon,
+      address_distance_km: state.addressDistanceKm || null,
       preferred_time: finalTime,
       payment_method: state.paymentMethod,
       promo_code: state.promo?.code || "",
@@ -500,6 +541,10 @@
         try { detail = JSON.parse(t).detail || ""; } catch (_) {}
         if (detail === "branch_closed") throw new Error(T("err_branch_closed"));
         if (detail === "branch_not_found") throw new Error(T("err_branch_closed"));
+        if (detail && detail.startsWith("min_order:")) {
+          const minVal = parseInt(detail.split(":")[1]) || 0;
+          throw new Error(tfmt("err_min_order", { min: fmt(minVal) }));
+        }
         throw new Error(`${T("err_server")}${r.status} ${t.slice(0, 100)}`);
       }
       const data = await r.json();

@@ -142,10 +142,10 @@
   }
 
   function statusClass(s) {
-    return { pending: "st-pending", confirmed: "st-confirmed", delivered: "st-delivered", cancelled: "st-cancelled" }[s] || "st-pending";
+    return { pending: "st-pending", confirmed: "st-confirmed", preparing: "st-preparing", on_the_way: "st-on_the_way", delivered: "st-delivered", cancelled: "st-cancelled" }[s] || "st-pending";
   }
   function stripeClass(s) {
-    return { pending: "stripe-pending", confirmed: "stripe-confirmed", delivered: "stripe-delivered", cancelled: "stripe-cancelled" }[s] || "stripe-pending";
+    return { pending: "stripe-pending", confirmed: "stripe-confirmed", preparing: "stripe-preparing", on_the_way: "stripe-on_the_way", delivered: "stripe-delivered", cancelled: "stripe-cancelled" }[s] || "stripe-pending";
   }
 
   function card(o) {
@@ -167,6 +167,16 @@
            <button class="ao-qa-btn ao-qa-cancel qa-cancel">${T("act_cancel")}</button>
          </div>`
       : o.status === "confirmed"
+      ? `<div class="ao-quick-actions">
+           <button class="ao-qa-btn ao-qa-prepare qa-prepare">${T("act_prepare")}</button>
+           <button class="ao-qa-btn ao-qa-cancel qa-cancel">${T("act_cancel")}</button>
+         </div>`
+      : o.status === "preparing"
+      ? `<div class="ao-quick-actions">
+           <button class="ao-qa-btn ao-qa-on-way qa-on-way">${T("act_on_way")}</button>
+           <button class="ao-qa-btn ao-qa-cancel qa-cancel">${T("act_cancel")}</button>
+         </div>`
+      : o.status === "on_the_way"
       ? `<div class="ao-quick-actions">
            <button class="ao-qa-btn ao-qa-deliver qa-deliver">${T("act_delivered")}</button>
            <button class="ao-qa-btn ao-qa-cancel qa-cancel">${T("act_cancel")}</button>
@@ -222,6 +232,8 @@
       };
     };
     wireQuick(".qa-confirm", "confirmed");
+    wireQuick(".qa-prepare", "preparing");
+    wireQuick(".qa-on-way",  "on_the_way");
     wireQuick(".qa-deliver", "delivered");
     wireQuick(".qa-cancel",  "cancelled", "confirm_cancel");
     return el;
@@ -272,6 +284,14 @@
         <button class="primary-btn act-confirm">${T("act_confirm")}</button>
         <button class="ghost-btn act-cancel" style="border-color:var(--danger);color:var(--danger)">${T("act_cancel")}</button>`;
     } else if (o.status === "confirmed") {
+      actionsHtml = `
+        <button class="primary-btn act-prepare">${T("act_prepare")}</button>
+        <button class="ghost-btn act-cancel" style="border-color:var(--danger);color:var(--danger)">${T("act_cancel")}</button>`;
+    } else if (o.status === "preparing") {
+      actionsHtml = `
+        <button class="primary-btn act-on-way">${T("act_on_way")}</button>
+        <button class="ghost-btn act-cancel" style="border-color:var(--danger);color:var(--danger)">${T("act_cancel")}</button>`;
+    } else if (o.status === "on_the_way") {
       actionsHtml = `
         <button class="primary-btn act-delivered">${T("act_delivered")}</button>
         <button class="ghost-btn act-cancel" style="border-color:var(--danger);color:var(--danger)">${T("act_cancel")}</button>`;
@@ -360,6 +380,8 @@
       };
     };
     setAct(".act-confirm",   "confirmed");
+    setAct(".act-prepare",   "preparing");
+    setAct(".act-on-way",    "on_the_way");
     setAct(".act-delivered", "delivered");
     setAct(".act-cancel",    "cancelled", "confirm_cancel");
   }

@@ -197,6 +197,8 @@ _MIGRATIONS = [
     ("feedback", "status",      "TEXT DEFAULT 'open'"),
     # Branch open/closed manual override (NULL = use hours schedule, 1 = forced open, 0 = forced closed).
     ("branches", "is_open",     "INTEGER DEFAULT 1"),
+    # Product stock: 1 = available, 0 = out of stock (shown grayed out, can't add to cart).
+    ("products", "in_stock",    "INTEGER DEFAULT 1"),
 ]
 
 
@@ -629,6 +631,23 @@ class Database:
         await self.conn.commit()
         return cur.rowcount > 0
 
+    async def toggle_product_stock(self, product_id: int) -> bool | None:
+        """Toggle in_stock 0↔1. Returns new in_stock value, or None if not found."""
+        async with self.conn.execute(
+            "SELECT in_stock FROM products WHERE id=? AND tenant_id=? AND is_active=1",
+            (product_id, self.tenant_id),
+        ) as cur:
+            row = await cur.fetchone()
+        if row is None:
+            return None
+        new_val = 0 if row["in_stock"] else 1
+        await self.conn.execute(
+            "UPDATE products SET in_stock=? WHERE id=? AND tenant_id=?",
+            (new_val, product_id, self.tenant_id),
+        )
+        await self.conn.commit()
+        return bool(new_val)
+
     async def get_product(self, product_id: int) -> dict[str, Any] | None:
         async with self.conn.execute(
             "SELECT * FROM products WHERE id=? AND tenant_id=?",
@@ -1037,3 +1056,32 @@ class Database:
         ) as cur:
             rows = await cur.fetchall()
         return {r["status"]: int(r["n"]) for r in rows}
+
+    async def today_summary(self) -> dict[str, Any]:
+        """Full summary for today: order count, revenue, top-3 products, by-status counts."""
+        today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+        today_str = today.isoformat(timespec="seconds")
+        async with self.conn.execute(
+            """SELECT COALESCE(SUM(amount), 0) AS revenue, COUNT(*) AS total,
+                      SUM(CASE WHEN status='pending'   THEN 1 ELSE 0 END) AS pending,
+                      SUM(CASE WHEN status='confirmed' THEN 1 ELSE 0 END) AS confirmed,
+                      SUM(CASE WHEN status='preparing' THEN 1 ELSE 0 END) AS preparing,
+                      SUM(CASE WHEN status='on_the_way' THEN 1 ELSE 0 END) AS on_the_way,
+                      SUM(CASE WHEN status='delivered' THEN 1 ELSE 0 END) AS delivered,
+                      SUM(CASE WHEN status='cancelled' THEN 1 ELSE 0 END) AS cancelled
+               FROM orders WHERE tenant_id=? AND created_at>=?""",
+            (self.tenant_id, today_str),
+        ) as cur:
+            row = await cur.fetchone()
+        top = await self.top_products(limit=3)
+        return {
+            "total":     int((row or {}).get("total", 0)),
+            "revenue":   int((row or {}).get("revenue", 0)),
+            "pending":   int((row or {}).get("pending", 0)),
+            "confirmed": int((row or {}).get("confirmed", 0)),
+            "preparing": int((row or {}).get("preparing", 0)),
+            "on_the_way":int((row or {}).get("on_the_way", 0)),
+            "delivered": int((row or {}).get("delivered", 0)),
+            "cancelled": int((row or {}).get("cancelled", 0)),
+            "top":       top,
+        }

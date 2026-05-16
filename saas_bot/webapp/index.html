@@ -127,6 +127,7 @@
         <h3 class="co-title" data-t="lbl_price_details">🧾 Hisob</h3>
         <div class="row"><span data-t="lbl_subtotal">Mahsulotlar:</span><span id="checkoutSubtotal">0</span></div>
         <div id="checkoutDiscountRow" class="row hidden" style="color:var(--success)"><span data-t="lbl_discount">Chegirma:</span><span id="checkoutDiscount">0</span></div>
+        <div id="checkoutDeliveryFeeRow" class="row hidden" style="color:var(--text-muted)"><span data-t="lbl_delivery_fee">Yetkazib berish:</span><span id="checkoutDeliveryFee">0</span></div>
         <div class="row total"><span data-t="lbl_total">Jami:</span><strong id="checkoutTotal">0</strong></div>
       </section>
 
@@ -283,6 +284,8 @@
         err_addr: "📍 Manzilni kiriting", err_cart_empty: "🛒 Savatcha bo'sh",
         err_no_init: "⚠️ Botdan 'Buyurtma berish' tugmasi orqali oching",
         err_branch_closed: "🚫 Bu filial hozir yopiq. Boshqa filial tanlang.",
+        err_min_order: "⚠️ Minimal buyurtma: {min}. Yana qo'shing.",
+        lbl_delivery_fee: "🚚 Yetkazib berish:",
         err_server: "Server xato: ", err_geo_unsupported: "⚠️ Brauzeringiz joylashuvni qo'llab-quvvatlamaydi",
         err_geocode: "Manzilni aniqlab bo'lmadi", err_geo_denied: "Joylashuvga ruxsat berilmadi yoki olib bo'lmadi",
         err_addr_empty: "Manzilni yozing",
@@ -301,8 +304,9 @@
         confirm_cancel_my: "Buyurtmani bekor qilasizmi?",
         cancel_failed: "Bekor qilib bo'lmadi",
         status_pending: "⏳ Kutilmoqda", status_confirmed: "✅ Tasdiqlangan",
+        status_preparing: "👨‍🍳 Tayyorlanmoqda", status_on_the_way: "🚗 Yo'lda",
         status_delivered: "📦 Yetkazilgan", status_cancelled: "❌ Bekor qilingan",
-        soum: "so'm", add_to_cart: "➕ Qo'shish", more_items: "+{n}",
+        soum: "so'm", add_to_cart: "➕ Qo'shish", more_items: "+{n}", out_of_stock: "Tugadi",
         addr_confirm_q: "Shu manzilga buyurtma berilsinmi?",
         addr_yes: "✅ Ha, shu yerga", addr_no: "✏ Boshqa manzil",
         extend_label: "➕ Buyurtma #", extend_to: "ga qo'shimcha",
@@ -342,6 +346,8 @@
         err_addr: "📍 Enter the address", err_cart_empty: "🛒 Cart is empty",
         err_no_init: "⚠️ Open via the bot's 'Place order' button",
         err_branch_closed: "🚫 This branch is currently closed. Please select another branch.",
+        err_min_order: "⚠️ Minimum order: {min}. Please add more items.",
+        lbl_delivery_fee: "🚚 Delivery fee:",
         err_server: "Server error: ", err_geo_unsupported: "⚠️ Your browser doesn't support geolocation",
         err_geocode: "Could not detect address", err_geo_denied: "Location access denied or unavailable",
         err_addr_empty: "Enter an address",
@@ -360,8 +366,9 @@
         confirm_cancel_my: "Cancel this order?",
         cancel_failed: "Could not cancel",
         status_pending: "⏳ Pending", status_confirmed: "✅ Confirmed",
+        status_preparing: "👨‍🍳 Preparing", status_on_the_way: "🚗 On the way",
         status_delivered: "📦 Delivered", status_cancelled: "❌ Cancelled",
-        soum: "so'm", add_to_cart: "➕ Add", more_items: "+{n}",
+        soum: "so'm", add_to_cart: "➕ Add", more_items: "+{n}", out_of_stock: "Sold out",
         addr_confirm_q: "Order to this address?",
         addr_yes: "✅ Yes, here", addr_no: "✏ Different address",
         extend_label: "➕ Adding to order #", extend_to: "",
@@ -401,6 +408,8 @@
         err_addr: "📍 Введите адрес", err_cart_empty: "🛒 Корзина пуста",
         err_no_init: "⚠️ Откройте через кнопку «Сделать заказ» в боте",
         err_branch_closed: "🚫 Этот филиал сейчас закрыт. Выберите другой филиал.",
+        err_min_order: "⚠️ Минимальный заказ: {min}. Добавьте ещё товары.",
+        lbl_delivery_fee: "🚚 Доставка:",
         err_server: "Ошибка сервера: ", err_geo_unsupported: "⚠️ Ваш браузер не поддерживает геолокацию",
         err_geocode: "Не удалось определить адрес", err_geo_denied: "Доступ к геолокации запрещён",
         err_addr_empty: "Введите адрес",
@@ -419,8 +428,9 @@
         confirm_cancel_my: "Отменить заказ?",
         cancel_failed: "Не удалось отменить",
         status_pending: "⏳ В ожидании", status_confirmed: "✅ Подтверждён",
+        status_preparing: "👨‍🍳 Готовится", status_on_the_way: "🚗 В пути",
         status_delivered: "📦 Доставлен", status_cancelled: "❌ Отменён",
-        soum: "сум", add_to_cart: "➕ Добавить", more_items: "+{n}",
+        soum: "сум", add_to_cart: "➕ Добавить", more_items: "+{n}", out_of_stock: "Нет в наличии",
         addr_confirm_q: "Заказ на этот адрес?",
         addr_yes: "✅ Да, сюда", addr_no: "✏ Другой адрес",
         extend_label: "➕ Дополнение к заказу #", extend_to: "",

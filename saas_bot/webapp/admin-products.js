@@ -108,18 +108,35 @@
 
   function card(p) {
     const c = document.createElement("div");
-    c.className = "admin-prod-card";
+    c.className = "admin-prod-card" + (p.in_stock === 0 ? " out-of-stock" : "");
     const img = p.image_url
       ? `<div class="admin-prod-img" style="background-image:url('${escapeHtml(p.image_url)}')"></div>`
       : `<div class="admin-prod-img admin-prod-img-empty">🍔</div>`;
+    const stockLabel = p.in_stock === 0 ? T("stock_out") : T("stock_in");
+    const stockClass = p.in_stock === 0 ? "stock-badge out" : "stock-badge in";
     c.innerHTML = `
       ${img}
       <div class="admin-prod-info">
         <div class="admin-prod-name">${escapeHtml(p.name)}</div>
         <div class="admin-prod-price">${fmt(p.price_value)}</div>
+        <button class="stock-toggle-btn ${stockClass}" data-id="${p.id}">${stockLabel}</button>
       </div>
     `;
-    c.onclick = () => openEdit(p);
+    c.querySelector(".stock-toggle-btn").onclick = async (e) => {
+      e.stopPropagation();
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      try {
+        const res = await api("POST", `/api/admin/products/${p.id}/toggle-stock`);
+        p.in_stock = res.in_stock ? 1 : 0;
+        c.className = "admin-prod-card" + (p.in_stock === 0 ? " out-of-stock" : "");
+        btn.textContent = p.in_stock === 0 ? T("stock_out") : T("stock_in");
+        btn.className = "stock-toggle-btn " + (p.in_stock === 0 ? "stock-badge out" : "stock-badge in");
+        if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred("light");
+      } catch (err) { alert("⚠️ " + err.message); }
+      finally { btn.disabled = false; }
+    };
+    c.onclick = (e) => { if (!e.target.closest(".stock-toggle-btn")) openEdit(p); };
     return c;
   }
 

@@ -707,4 +707,10 @@ CONFIG = {
     "phone": "+998901234567",
     "admin_username": "minifoodadmin",
     "admin_ids": [int(x) for x in os.getenv("TENANT_001_ADMINS", "").split(",") if x.strip().isdigit()] or [123456789],
+    # Delivery fee config
+    "min_order":           30000,   # Minimum order amount (so'm). 0 = no minimum.
+    "delivery_fee_base":   10000,   # Base delivery fee (so'm).
+    "delivery_fee_per_km": 2000,    # Extra fee per km beyond free_km.
+    "delivery_free_km":    3,       # First N km included in base fee.
+    "delivery_free_from":  150000,  # Free delivery if order >= this amount.
 }
