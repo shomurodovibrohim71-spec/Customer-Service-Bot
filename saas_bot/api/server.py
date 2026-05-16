@@ -1685,7 +1685,7 @@ async def api_get_upsell_categories(
     _check_admin(t, init_data, uid)
     db = get_db(tenant)
     settings = await db.all_settings()
-    all_cats = [r["name"] for r in await db.list_categories()]
+    all_cats = await db.list_categories()  # returns list[str]
     _default = ["🥤 Ichimliklar", "🥗 Salatlar", "🍮 Shirinliklar"]
     try:
         current = _json.loads(settings.get("upsell.categories", "null") or "null") or _default
