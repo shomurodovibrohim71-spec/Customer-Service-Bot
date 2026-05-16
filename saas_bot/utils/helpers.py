@@ -263,5 +263,14 @@ def phone_request_keyboard(label: str) -> ReplyKeyboardMarkup:
     )
 
 
+def location_request_keyboard(label: str) -> ReplyKeyboardMarkup:
+    """Reply keyboard with a single location-share button."""
+    return ReplyKeyboardMarkup(
+        [[KeyboardButton(label, request_location=True)]],
+        resize_keyboard=True,
+        one_time_keyboard=True,
+    )
+
+
 def remove_reply_keyboard() -> ReplyKeyboardRemove:
     return ReplyKeyboardRemove()

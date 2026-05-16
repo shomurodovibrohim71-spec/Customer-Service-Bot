@@ -21,6 +21,7 @@ from utils.helpers import (
     admin_reply_keyboard,
     is_valid_phone,
     language_keyboard,
+    location_request_keyboard,
     main_reply_keyboard,
     normalize_phone,
     phone_request_keyboard,
@@ -58,6 +59,15 @@ async def _send_phone_prompt(message_or_chat, context, tenant: Tenant, lang: str
             parse_mode=ParseMode.MARKDOWN,
             reply_markup=phone_request_keyboard(share_label),
         )
+
+
+async def _send_location_prompt(chat_id: int, context, tenant: Tenant, lang: str) -> None:
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=tenant.t(lang, "geo_required_prompt"),
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=location_request_keyboard(tenant.t(lang, "geo_share_btn")),
+    )
 
 
 async def _send_branch_prompt(chat_id: int, context, tenant: Tenant, db: Database, lang: str) -> None:
@@ -112,9 +122,17 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         await _send_phone_prompt(update.message, context, tenant, lang)
         return
 
-    # Fully onboarded -> main menu (admin or user keyboard).
+    # Admin skips geolocation requirement.
     user_view = context.user_data.get("user_view", False)
     is_admin = tenant.is_admin(user.id) and not user_view
+
+    if not is_admin:
+        existing_addrs = await db.list_addresses(user.id)
+        if not existing_addrs:
+            await _send_location_prompt(update.message.chat_id, context, tenant, lang)
+            return
+
+    # Fully onboarded -> main menu (admin or user keyboard).
     if is_admin:
         await update.message.reply_text(
             tenant.admin_t(lang, "admin_welcome"),
@@ -213,22 +231,72 @@ async def phone_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         raise ApplicationHandlerStop()
 
     await db.set_phone(user.id, phone)
-    # If they have never shared a location, add a one-time hint to the welcome
-    # screen so they save it now — checkout will auto-fill it next time.
-    existing_addrs = await db.list_addresses(user.id)
     user_view = context.user_data.get("user_view", False)
     is_admin = tenant.is_admin(user.id) and not user_view
+
     if is_admin:
-        text = tenant.admin_t(lang, "admin_welcome")
-        kb = admin_reply_keyboard(tenant, lang)
+        await context.bot.send_message(
+            chat_id=msg.chat_id,
+            text=tenant.admin_t(lang, "admin_welcome"),
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=admin_reply_keyboard(tenant, lang),
+        )
     else:
-        text = tenant.t(lang, "registered")
-        if not existing_addrs:
-            text += "\n\n" + tenant.t(lang, "geo_onboarding_hint")
-        kb = main_reply_keyboard(tenant, lang)
+        # After phone, next mandatory step is geolocation.
+        existing_addrs = await db.list_addresses(user.id)
+        if existing_addrs:
+            await context.bot.send_message(
+                chat_id=msg.chat_id,
+                text=tenant.t(lang, "registered"),
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=main_reply_keyboard(tenant, lang),
+            )
+        else:
+            await _send_location_prompt(msg.chat_id, context, tenant, lang)
+    raise ApplicationHandlerStop()
+
+
+# ========================================================= onboarding location
+
+async def onboarding_location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Captures the mandatory location shared during onboarding."""
+    msg = update.message
+    user = update.effective_user
+    if msg is None or user is None or msg.location is None:
+        return
+    tenant = _tenant(context)
+    db = _db(context)
+
+    row = await db.get_user(user.id)
+    lang = (row or {}).get("language") or tenant.default_language
+
+    # Skip if admin or already has address
+    if tenant.is_admin(user.id) and not context.user_data.get("user_view"):
+        return
+    existing_addrs = await db.list_addresses(user.id)
+    if existing_addrs:
+        return
+
+    lat = msg.location.latitude
+    lon = msg.location.longitude
+
+    # Try to get human-readable address from coordinates
+    addr_text = ""
+    try:
+        from core.geocoder import reverse_geocode
+        addr_text = await reverse_geocode(lat, lon, lang) or ""
+    except Exception:
+        pass
+    if not addr_text:
+        addr_text = f"{lat:.5f}, {lon:.5f}"
+
+    await db.add_address(user.id, label="🏠", text=addr_text, lat=lat, lon=lon)
+
     await context.bot.send_message(
-        chat_id=msg.chat_id, text=text,
-        parse_mode=ParseMode.MARKDOWN, reply_markup=kb,
+        chat_id=msg.chat_id,
+        text=tenant.t(lang, "geo_saved_onboarding", address=addr_text),
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=main_reply_keyboard(tenant, lang),
     )
     raise ApplicationHandlerStop()
 
@@ -275,12 +343,11 @@ def register(app: Application) -> None:
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("menu", start_command))
     app.add_handler(CallbackQueryHandler(language_callback, pattern=r"^lang:[a-z_]+$"))
-    # Legacy: register_branch_callback no longer wired - branch selection is per-order.
-    # IMPORTANT: phone_handler must NOT catch every TEXT update, otherwise it
-    # will block sibling group=0 handlers (addproduct/addbranch entry points)
-    # since PTB only invokes one handler per group per update.
-    # We restrict it to phone-shaped text (+998..., 12-15 digits) so normal
-    # admin button taps fall through to their own handlers.
+    # Onboarding location — must be before phone_handler in group=0
+    app.add_handler(
+        MessageHandler(filters.LOCATION, onboarding_location_handler),
+        group=0,
+    )
     phone_regex = filters.Regex(r"^\s*\+?[\d\s\-\(\)]{9,18}\s*$")
     app.add_handler(
         MessageHandler(filters.CONTACT | phone_regex, phone_handler),

@@ -160,6 +160,13 @@ TEXTS = {
         "phone_invalid":     "⚠️ Noto'g'ri raqam. Iltimos, `+998901234567` ko'rinishida yuboring.",
         "registered":        "✅ Ro'yxatdan o'tdingiz!\n\nQuyidagi menyudan kerakli bo'limni tanlang 👇",
         "geo_onboarding_hint": "📍 Lokatsiyangizni saqlang — keyingi buyurtmalarda manzilingiz avtomatik to'ldiriladi.\n_Pastdagi *📍 Geolokatsiyani yuborish* tugmasini bosing._",
+        "geo_required_prompt": (
+            "📍 *Joylashuvingizni yuboring*\n\n"
+            "Yetkazib berish xizmatidan foydalanish uchun joylashuvingiz kerak.\n"
+            "Pastdagi tugmani bosing 👇"
+        ),
+        "geo_share_btn":       "📍 Joylashuvimni yuborish",
+        "geo_saved_onboarding": "✅ Manzil saqlandi: *{address}*\n\nEndi buyurtma bera olasiz! 👇",
         "order_start":       "Boshlaymiz 👨‍🍳\n\nQuyidagidan taom tanlang:",
         "order_ask_name":    "📝 Iltimos, ismingizni kiriting:",
         "order_ask_branch":  "🏪 Qaysi filialdan olmoqchisiz?",
@@ -289,6 +296,13 @@ TEXTS = {
         'phone_invalid': '⚠️ Invalid number. Please send in `+998901234567` format.',
         'registered': "✅ You're registered!\n\nChoose an option from the menu 👇",
         'geo_onboarding_hint': "📍 Save your location — your address will be auto-filled in future orders.\n_Tap *📍 Send Geolocation* below._",
+        'geo_required_prompt': (
+            "📍 *Share your location*\n\n"
+            "We need your location to deliver orders to you.\n"
+            "Tap the button below 👇"
+        ),
+        'geo_share_btn':       "📍 Share my location",
+        'geo_saved_onboarding': "✅ Address saved: *{address}*\n\nYou can now place orders! 👇",
         'order_start': "Let's begin 👨\u200d🍳\n\nChoose a dish:",
         'order_ask_name': '📝 Please enter your name:',
         'order_ask_branch': '🏪 Which branch?',
@@ -382,6 +396,13 @@ TEXTS = {
         "phone_invalid":     "⚠️ Неверный номер. Отправьте в формате `+998901234567`.",
         "registered":        "✅ Вы зарегистрированы!\n\nВыберите раздел из меню 👇",
         "geo_onboarding_hint": "📍 Сохраните геолокацию — адрес автоматически подставится в следующих заказах.\n_Нажмите *📍 Отправить геолокацию* ниже._",
+        "geo_required_prompt": (
+            "📍 *Отправьте ваше местоположение*\n\n"
+            "Для получения доставки нам нужен ваш адрес.\n"
+            "Нажмите кнопку ниже 👇"
+        ),
+        "geo_share_btn":       "📍 Отправить геолокацию",
+        "geo_saved_onboarding": "✅ Адрес сохранён: *{address}*\n\nТеперь можете делать заказы! 👇",
         "order_start":       "Начинаем 👨‍🍳\n\nВыберите блюдо:",
         "order_ask_name":    "📝 Введите ваше имя:",
         "order_ask_branch":  "🏪 Из какого филиала?",
