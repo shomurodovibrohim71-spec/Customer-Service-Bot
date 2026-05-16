@@ -381,9 +381,18 @@
     renderUpsellProducts(upsellState.activeChip);
   }
 
-  function openCart() {
+  async function openCart() {
     openScreen("cartScreen");
     renderCartItems();
+    // Re-fetch upsell_categories so admin changes take effect immediately
+    // without requiring a full page reload.
+    try {
+      const r = await fetch(`/api/menu?tenant=${encodeURIComponent(tenantId)}`);
+      if (r.ok) {
+        const fresh = await r.json();
+        if (state.menu) state.menu.upsell_categories = fresh.upsell_categories;
+      }
+    } catch (_) {}
     renderCartUpsells();
   }
   $("cartBack").onclick = () => closeScreen("cartScreen");
