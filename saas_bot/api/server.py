@@ -54,9 +54,17 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title="SaaS Bot API + WebApp", version="2.0.0", lifespan=lifespan)
 
-# Static frontend files at /static/*
-if WEBAPP_DIR.exists():
-    app.mount("/static", StaticFiles(directory=str(WEBAPP_DIR)), name="static")
+# Static frontend files at /static/* — served with no-cache headers so JS/CSS
+# updates reach Telegram WebView immediately without manual refresh.
+@app.get("/static/{filename:path}")
+async def static_file(filename: str) -> FileResponse:
+    path = WEBAPP_DIR / filename
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="not found")
+    return FileResponse(str(path), headers={
+        "Cache-Control": "no-cache, no-store, must-revalidate, max-age=0",
+        "Pragma": "no-cache", "Expires": "0",
+    })
 
 
 # WebApp HTMLs must never be cached — Telegram WebView keeps stale copies for
@@ -109,66 +117,42 @@ async def health() -> dict[str, Any]:
 
 @app.get("/webapp")
 async def webapp_index() -> FileResponse:
-    index = WEBAPP_DIR / "index.html"
-    if not index.exists():
-        raise HTTPException(status_code=404, detail="webapp not built")
-    return FileResponse(str(index))
+    return _webapp_file("index.html")
 
 
 @app.get("/webapp/branches")
 async def webapp_branches() -> FileResponse:
-    index = WEBAPP_DIR / "branches.html"
-    if not index.exists():
-        raise HTTPException(status_code=404, detail="branches page not built")
-    return FileResponse(str(index))
+    return _webapp_file("branches.html")
 
 
 @app.get("/webapp/admin/products")
 async def webapp_admin_products() -> FileResponse:
-    index = WEBAPP_DIR / "admin-products.html"
-    if not index.exists():
-        raise HTTPException(status_code=404, detail="admin products page not built")
-    return FileResponse(str(index))
+    return _webapp_file("admin-products.html")
 
 
 @app.get("/webapp/admin/stats")
 async def webapp_admin_stats() -> FileResponse:
-    index = WEBAPP_DIR / "admin-stats.html"
-    if not index.exists():
-        raise HTTPException(status_code=404, detail="admin stats page not built")
-    return FileResponse(str(index))
+    return _webapp_file("admin-stats.html")
 
 
 @app.get("/webapp/admin/promos")
 async def webapp_admin_promos() -> FileResponse:
-    index = WEBAPP_DIR / "admin-promos.html"
-    if not index.exists():
-        raise HTTPException(status_code=404, detail="admin promos page not built")
-    return FileResponse(str(index))
+    return _webapp_file("admin-promos.html")
 
 
 @app.get("/webapp/admin/company")
 async def webapp_admin_company() -> FileResponse:
-    index = WEBAPP_DIR / "admin-company.html"
-    if not index.exists():
-        raise HTTPException(status_code=404, detail="admin company page not built")
-    return FileResponse(str(index))
+    return _webapp_file("admin-company.html")
 
 
 @app.get("/webapp/admin/feedback")
 async def webapp_admin_feedback() -> FileResponse:
-    index = WEBAPP_DIR / "admin-feedback.html"
-    if not index.exists():
-        raise HTTPException(status_code=404, detail="admin feedback page not built")
-    return FileResponse(str(index))
+    return _webapp_file("admin-feedback.html")
 
 
 @app.get("/webapp/admin/orders")
 async def webapp_admin_orders() -> FileResponse:
-    index = WEBAPP_DIR / "admin-orders.html"
-    if not index.exists():
-        raise HTTPException(status_code=404, detail="admin orders page not built")
-    return FileResponse(str(index))
+    return _webapp_file("admin-orders.html")
 
 
 @app.get("/webapp/admin/branches")
