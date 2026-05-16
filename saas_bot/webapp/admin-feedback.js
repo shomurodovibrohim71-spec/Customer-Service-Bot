@@ -154,11 +154,40 @@
     const f = d.feedback;
     const uname = f.username ? `<a href="https://t.me/${escapeHtml(f.username)}" target="_blank">@${escapeHtml(f.username)}</a>` : T("no_username");
     const phone = f.phone ? `<a href="tel:${escapeHtml(f.phone)}">📞 ${escapeHtml(f.phone)}</a>` : "—";
+
+    const cats = ["complaint", "question", "suggestion"];
+    const catBtns = cats.map(c =>
+      `<button class="cat-pick-btn${f.category === c ? " active" : ""}" data-cat="${c}">${T("cat_" + c)}</button>`
+    ).join("");
+
     $("threadMeta").innerHTML = `
       <div class="fb-meta-row"><span class="fb-meta-key">👤</span> ${escapeHtml(f.name || ("id" + f.user_id))} • ${uname}</div>
       <div class="fb-meta-row"><span class="fb-meta-key">📞</span> ${phone}</div>
-      <div class="fb-meta-row">${catBadge(f.category)} ${statusBadge(f.status)} <span class="fb-meta-date">${escapeHtml(fmtDate(f.created_at))}</span></div>
+      <div class="fb-meta-row">${statusBadge(f.status)} <span class="fb-meta-date">${escapeHtml(fmtDate(f.created_at))}</span></div>
+      <div class="fb-cat-row">
+        <span class="fb-meta-key">${T("lbl_category")}</span>
+        <div class="cat-pick-group" id="catPickGroup">${catBtns}</div>
+      </div>
     `;
+
+    $("catPickGroup").querySelectorAll(".cat-pick-btn").forEach(btn => {
+      btn.onclick = async () => {
+        const newCat = btn.dataset.cat;
+        btn.disabled = true;
+        try {
+          await api("POST", "/api/admin/feedback/set-category", {
+            feedback_id: f.id, category: newCat,
+          });
+          f.category = newCat;
+          $("catPickGroup").querySelectorAll(".cat-pick-btn").forEach(b => {
+            b.classList.toggle("active", b.dataset.cat === newCat);
+          });
+          if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred("light");
+          load();
+        } catch (e) { alert("⚠️ " + e.message); }
+        finally { btn.disabled = false; }
+      };
+    });
     const wrap = $("threadMsgs");
     wrap.innerHTML = "";
     d.messages.forEach(m => {

@@ -300,6 +300,51 @@ class Database:
             row = await cur.fetchone()
             return int(row["n"]) if row else 0
 
+    async def list_users_with_stats(
+        self,
+        search: str = "",
+        sort_by: str = "last_seen",
+        limit: int = 200,
+    ) -> list[dict[str, Any]]:
+        """Return users with order stats. sort_by: last_seen | orders | spend."""
+        order_col = {
+            "orders": "order_count DESC",
+            "spend":  "total_spend DESC",
+        }.get(sort_by, "u.last_seen DESC")
+
+        q = """
+            SELECT u.id, u.name, u.username, u.phone, u.language,
+                   u.created_at, u.last_seen,
+                   COUNT(o.id)               AS order_count,
+                   COALESCE(SUM(o.amount),0) AS total_spend,
+                   MAX(o.created_at)         AS last_order_at
+            FROM users u
+            LEFT JOIN orders o ON o.user_id=u.id AND o.tenant_id=u.tenant_id
+                                AND o.status != 'cancelled'
+            WHERE u.tenant_id=?
+        """
+        params: list[Any] = [self.tenant_id]
+        if search:
+            q += " AND (u.name LIKE ? OR u.username LIKE ? OR u.phone LIKE ?)"
+            s = f"%{search}%"
+            params += [s, s, s]
+        q += f" GROUP BY u.id ORDER BY {order_col} LIMIT ?"
+        params.append(limit)
+        async with self.conn.execute(q, params) as cur:
+            rows = await cur.fetchall()
+        return [dict(r) for r in rows]
+
+    async def get_user_orders(self, user_id: int, limit: int = 20) -> list[dict[str, Any]]:
+        """Last N orders for a specific user."""
+        async with self.conn.execute(
+            """SELECT id, status, amount, delivery_fee, created_at, address, branch, service
+               FROM orders WHERE tenant_id=? AND user_id=?
+               ORDER BY id DESC LIMIT ?""",
+            (self.tenant_id, user_id, limit),
+        ) as cur:
+            rows = await cur.fetchall()
+        return [dict(r) for r in rows]
+
     async def count_new_users_today(self) -> int:
         cutoff = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         async with self.conn.execute(
@@ -849,6 +894,14 @@ class Database:
             (status, fb_id, self.tenant_id),
         )
         await self.conn.commit()
+
+    async def set_feedback_category(self, fb_id: int, category: str) -> bool:
+        cur = await self.conn.execute(
+            "UPDATE feedback SET category=? WHERE id=? AND tenant_id=?",
+            (category, fb_id, self.tenant_id),
+        )
+        await self.conn.commit()
+        return cur.rowcount > 0
 
     async def add_feedback_message(
         self, feedback_id: int, role: str, content: str,

@@ -1059,6 +1059,28 @@ class AdminFeedbackReplyIn(BaseModel):
     text: str
 
 
+class AdminFeedbackCategoryIn(BaseModel):
+    init_data: str = ""
+    fallback_uid: int | None = None
+    tenant_id: str
+    feedback_id: int
+    category: str  # complaint | question | suggestion
+
+
+@app.post("/api/admin/feedback/set-category")
+async def api_admin_feedback_set_category(payload: AdminFeedbackCategoryIn) -> dict[str, Any]:
+    """Admin manually overrides a feedback's category."""
+    if payload.category not in ("complaint", "question", "suggestion"):
+        raise HTTPException(status_code=400, detail="invalid category")
+    t = get_tenant(payload.tenant_id)
+    _check_admin(t, payload.init_data, payload.fallback_uid)
+    db = get_db(payload.tenant_id)
+    ok = await db.set_feedback_category(payload.feedback_id, payload.category)
+    if not ok:
+        raise HTTPException(status_code=404, detail="feedback not found")
+    return {"ok": True}
+
+
 @app.post("/api/admin/feedback/reply")
 async def api_admin_feedback_reply(payload: AdminFeedbackReplyIn) -> dict[str, Any]:
     """Admin replies to a feedback thread. Saves the message and sends it to the customer."""
@@ -1291,6 +1313,42 @@ async def api_admin_orders_status(payload: AdminOrderStatusIn) -> dict[str, Any]
             except httpx.HTTPError as exc:
                 logger.warning("[%s] order status notify failed: %s", t.id, exc)
     return {"ok": True}
+
+
+# ============================================================ Admin users
+
+@app.get("/api/admin/users")
+async def api_admin_users(
+    tenant: str,
+    init_data: str = "",
+    uid: int | None = None,
+    search: str = "",
+    sort: str = "last_seen",
+) -> dict[str, Any]:
+    """List all users with order stats. sort: last_seen | orders | spend."""
+    t = get_tenant(tenant)
+    _check_admin(t, init_data, uid)
+    db = get_db(tenant)
+    users = await db.list_users_with_stats(search=search, sort_by=sort)
+    return {"users": users, "total": len(users)}
+
+
+@app.get("/api/admin/users/{user_id}/orders")
+async def api_admin_user_orders(
+    user_id: int,
+    tenant: str,
+    init_data: str = "",
+    uid: int | None = None,
+) -> dict[str, Any]:
+    """Get order history for a specific user."""
+    t = get_tenant(tenant)
+    _check_admin(t, init_data, uid)
+    db = get_db(tenant)
+    u = await db.get_user(user_id)
+    if not u:
+        raise HTTPException(status_code=404, detail="user not found")
+    orders = await db.get_user_orders(user_id)
+    return {"user": u, "orders": orders}
 
 
 # ============================================================ Admin dashboard

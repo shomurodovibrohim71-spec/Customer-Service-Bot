@@ -7,6 +7,23 @@
   <title>Feedback</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <link rel="stylesheet" href="/static/styles.css">
+  <style>
+    .fb-cat-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 0 4px; flex-wrap: wrap;
+    }
+    .cat-pick-group { display: flex; gap: 6px; flex-wrap: wrap; }
+    .cat-pick-btn {
+      padding: 5px 12px; border-radius: 20px; border: 1px solid var(--line);
+      background: var(--bg-soft); color: var(--text-muted);
+      font-size: 12px; font-weight: 700; cursor: pointer;
+      transition: all .15s;
+    }
+    .cat-pick-btn.active[data-cat="complaint"] { background: rgba(255,93,93,.18); color: #f87171; border-color: transparent; }
+    .cat-pick-btn.active[data-cat="question"]  { background: rgba(255,176,32,.18); color: var(--warning); border-color: transparent; }
+    .cat-pick-btn.active[data-cat="suggestion"]{ background: rgba(74,222,128,.18); color: #4ade80; border-color: transparent; }
+    .cat-pick-btn:active { transform: scale(0.96); }
+  </style>
 </head>
 <body>
   <header class="topbar">
@@ -68,6 +85,7 @@
         role_user: "👤 Mijoz", role_ai: "🤖 AI", role_admin: "👑 Admin",
         ph_reply: "Mijozga javob yozing…", reply_btn: "📤 Yuborish", sending: "Yuborilmoqda…",
         replied: "✅ Javob yuborildi", err_empty: "Matn bo'sh", no_username: "—",
+        lbl_category: "Tur:",
       },
       en: {
         page_title: "📧 Feedback", loading: "Loading…", back: "Back",
@@ -80,6 +98,7 @@
         role_user: "👤 Customer", role_ai: "🤖 AI", role_admin: "👑 Admin",
         ph_reply: "Write a reply to the customer…", reply_btn: "📤 Send", sending: "Sending…",
         replied: "✅ Reply sent", err_empty: "Text empty", no_username: "—",
+        lbl_category: "Type:",
       },
       ru: {
         page_title: "📧 Обращения", loading: "Загрузка…", back: "Назад",
@@ -92,6 +111,7 @@
         role_user: "👤 Клиент", role_ai: "🤖 ИИ", role_admin: "👑 Админ",
         ph_reply: "Напишите ответ клиенту…", reply_btn: "📤 Отправить", sending: "Отправка…",
         replied: "✅ Ответ отправлен", err_empty: "Текст пустой", no_username: "—",
+        lbl_category: "Тип:",
       },
     };
   </script>
