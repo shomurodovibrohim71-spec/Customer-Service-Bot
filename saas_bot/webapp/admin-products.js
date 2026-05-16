@@ -198,26 +198,42 @@
   }
 
   // ── upsell category toggles
+  // Category names are stored as JS objects (not in data-* attributes)
+  // to avoid any HTML encoding/decoding issues with emoji.
+  const _upsellCatMap = new Map(); // checkbox element → original category string
+
   async function loadUpsellCats() {
     const container = $("upsellCatsList");
     if (!container) return;
+    _upsellCatMap.clear();
     container.innerHTML = `<div class="loading" style="font-size:13px">${T("loading")}</div>`;
     try {
-      const data = await api("GET", "/api/admin/upsell-categories");
+      const qs = `?tenant=${encodeURIComponent(tenantId)}&uid=${fallbackUid || ""}&init_data=${encodeURIComponent(initData)}`;
+      const r = await fetch(`/api/admin/upsell-categories${qs}`);
+      if (!r.ok) throw new Error(await r.text());
+      const data = await r.json();
       const current = new Set(data.upsell_categories || []);
       const all = data.all_categories || [];
       container.innerHTML = "";
       all.forEach(cat => {
-        const checked = current.has(cat);
         const row = document.createElement("div");
         row.className = "upsell-row";
-        row.innerHTML = `
-          <span class="upsell-row-name">${escapeHtml(cat)}</span>
-          <label class="upsell-toggle">
-            <input type="checkbox" data-cat="${escapeHtml(cat)}" ${checked ? "checked" : ""}>
-            <span class="upsell-slider"></span>
-          </label>`;
-        row.querySelector("input").onchange = () => saveUpsellCats();
+        const nameSpan = document.createElement("span");
+        nameSpan.className = "upsell-row-name";
+        nameSpan.textContent = cat;          // textContent — no HTML encoding issues
+        const label = document.createElement("label");
+        label.className = "upsell-toggle";
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.checked = current.has(cat);
+        _upsellCatMap.set(checkbox, cat);    // store original string in Map
+        const slider = document.createElement("span");
+        slider.className = "upsell-slider";
+        label.appendChild(checkbox);
+        label.appendChild(slider);
+        row.appendChild(nameSpan);
+        row.appendChild(label);
+        checkbox.onchange = () => saveUpsellCats();
         container.appendChild(row);
       });
       if (!all.length) container.innerHTML = `<div class="info" style="font-size:13px">—</div>`;
@@ -227,12 +243,21 @@
   }
 
   async function saveUpsellCats() {
-    const checked = [...document.querySelectorAll("#upsellCatsList input[type=checkbox]:checked")]
-      .map(el => el.dataset.cat);
+    // Read checked categories directly from the Map (no data-* attribute encoding issues)
+    const checked = [];
+    _upsellCatMap.forEach((cat, checkbox) => {
+      if (checkbox.checked) checked.push(cat);
+    });
     try {
-      await api("POST", "/api/admin/upsell-categories", { categories: checked });
+      const qs = `?tenant=${encodeURIComponent(tenantId)}&uid=${fallbackUid || ""}&init_data=${encodeURIComponent(initData)}`;
+      const r = await fetch(`/api/admin/upsell-categories${qs}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ categories: checked }),
+      });
+      if (!r.ok) throw new Error(await r.text());
     } catch (e) {
-      alert(e.message);
+      alert("Xato: " + e.message);
     }
   }
 
