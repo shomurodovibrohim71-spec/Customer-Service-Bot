@@ -300,8 +300,10 @@
 
   function upsellCats() {
     if (!state.menu?.products) return [];
-    // Only show categories that admin marked as upsell AND have products in stock
-    const allowed = state.menu.upsell_categories || [];
+    const allowed = state.menu.upsell_categories;
+    // upsell_categories must be a non-empty array from the server.
+    // If missing or empty, hide upsell entirely (never fall back to all categories).
+    if (!Array.isArray(allowed) || !allowed.length) return [];
     return allowed.filter(c => state.menu.products[c]?.some(p => p.in_stock !== 0));
   }
 
