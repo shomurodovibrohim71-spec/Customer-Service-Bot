@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0f1115">
+  <title>Kuryerlar</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="/static/styles.css">
+  <style>
+    .courier-card { background: var(--card); border-radius: 14px; padding: 14px 16px; margin: 0 14px 10px; }
+    .courier-card-top { display: flex; justify-content: space-between; align-items: center; }
+    .courier-name { font-weight: 600; font-size: 15px; color: var(--text); }
+    .courier-phone { font-size: 13px; color: var(--sub); margin-top: 3px; }
+    .courier-tg { font-size: 12px; color: var(--sub); margin-top: 2px; }
+    .courier-actions { display: flex; gap: 8px; margin-top: 10px; }
+    .c-btn { flex: 1; padding: 8px 0; border-radius: 10px; border: none; font-size: 13px; cursor: pointer; font-weight: 600; }
+    .c-btn-edit { background: var(--accent); color: #fff; }
+    .c-btn-toggle { background: var(--card2, #2a2d35); color: var(--sub); }
+    .c-btn-toggle.inactive { color: #4ade80; }
+    .c-btn-del { background: #ff4d4d22; color: #ff4d4d; }
+    .inactive-badge { background: #ff4d4d33; color: #ff4d4d; font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: 600; }
+    .active-badge { background: #4ade8033; color: #4ade80; font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: 600; }
+    /* Add/Edit modal */
+    .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 200; display: flex; flex-direction: column; justify-content: flex-end; }
+    .modal-sheet { background: var(--bg); border-radius: 18px 18px 0 0; padding: 20px 16px 36px; }
+    .modal-title { font-size: 17px; font-weight: 700; margin-bottom: 16px; }
+    .modal-field { margin-bottom: 12px; }
+    .modal-field label { display: block; font-size: 12px; color: var(--sub); margin-bottom: 4px; }
+    .modal-field input { width: 100%; background: var(--card); border: none; border-radius: 10px; padding: 11px 14px; color: var(--text); font-size: 15px; outline: none; box-sizing: border-box; }
+    .modal-btns { display: flex; gap: 10px; margin-top: 16px; }
+    .modal-save { flex: 1; background: var(--accent); color: #fff; border: none; border-radius: 12px; padding: 13px; font-size: 15px; font-weight: 700; cursor: pointer; }
+    .modal-cancel { flex: 1; background: var(--card); color: var(--sub); border: none; border-radius: 12px; padding: 13px; font-size: 15px; cursor: pointer; }
+    .fab { position: fixed; bottom: 28px; right: 20px; background: var(--accent); color: #fff; border: none; width: 54px; height: 54px; border-radius: 50%; font-size: 26px; cursor: pointer; box-shadow: 0 4px 18px #0006; display: flex; align-items: center; justify-content: center; z-index: 100; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="page-title" data-t="page_title">🚗 Kuryerlar</div>
+    <div class="page-sub" id="totalSub">—</div>
+  </header>
+
+  <main>
+    <div id="errBox" class="err hidden" style="margin:14px"></div>
+    <div id="loading" class="loading" data-t="loading">Yuklanmoqda…</div>
+    <div id="courierList" style="padding-top:10px"></div>
+  </main>
+
+  <button class="fab" onclick="openAdd()" title="Yangi kuryer">+</button>
+
+  <!-- Add/Edit modal -->
+  <div id="modalBg" class="modal-bg hidden">
+    <div class="modal-sheet">
+      <div class="modal-title" id="modalTitle" data-t="add_title">Yangi kuryer</div>
+      <div class="modal-field">
+        <label data-t="lbl_name">Ism</label>
+        <input id="fName" type="text" placeholder="Sardor Toshmatov">
+      </div>
+      <div class="modal-field">
+        <label data-t="lbl_phone">Telefon</label>
+        <input id="fPhone" type="tel" placeholder="+998901234567">
+      </div>
+      <div class="modal-field">
+        <label data-t="lbl_tg">Telegram ID (ixtiyoriy)</label>
+        <input id="fTg" type="number" placeholder="123456789">
+      </div>
+      <div class="modal-btns">
+        <button class="modal-cancel" onclick="closeModal()" data-t="btn_cancel">Bekor</button>
+        <button class="modal-save" id="modalSaveBtn" onclick="saveModal()" data-t="btn_save">Saqlash</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    window.STRINGS = {
+      uz: { page_title:"🚗 Kuryerlar", loading:"Yuklanmoqda…",
+            total:"{n} ta kuryer", add_title:"Yangi kuryer", edit_title:"Kuryerni tahrirlash",
+            lbl_name:"Ism", lbl_phone:"Telefon", lbl_tg:"Telegram ID (ixtiyoriy)",
+            btn_cancel:"Bekor", btn_save:"Saqlash", btn_edit:"✏️ Tahrir", btn_del:"🗑",
+            btn_activate:"✅ Faollashtirish", btn_deactivate:"⏸ To'xtatish",
+            active:"Faol", inactive:"Nofaol", no_couriers:"Kuryerlar yo'q",
+            tg_id:"TG ID:", confirm_del:"O'chirishni tasdiqlaysizmi?" },
+      en: { page_title:"🚗 Couriers", loading:"Loading…",
+            total:"{n} couriers", add_title:"New courier", edit_title:"Edit courier",
+            lbl_name:"Name", lbl_phone:"Phone", lbl_tg:"Telegram ID (optional)",
+            btn_cancel:"Cancel", btn_save:"Save", btn_edit:"✏️ Edit", btn_del:"🗑",
+            btn_activate:"✅ Activate", btn_deactivate:"⏸ Deactivate",
+            active:"Active", inactive:"Inactive", no_couriers:"No couriers yet",
+            tg_id:"TG ID:", confirm_del:"Confirm deletion?" },
+      ru: { page_title:"🚗 Курьеры", loading:"Загрузка…",
+            total:"{n} курьеров", add_title:"Новый курьер", edit_title:"Редактировать курьера",
+            lbl_name:"Имя", lbl_phone:"Телефон", lbl_tg:"Telegram ID (необязательно)",
+            btn_cancel:"Отмена", btn_save:"Сохранить", btn_edit:"✏️ Изменить", btn_del:"🗑",
+            btn_activate:"✅ Активировать", btn_deactivate:"⏸ Деактивировать",
+            active:"Активен", inactive:"Неактивен", no_couriers:"Курьеров нет",
+            tg_id:"TG ID:", confirm_del:"Подтвердите удаление?" },
+    };
+  </script>
+  <script src="/static/i18n.js"></script>
+  <script src="/static/admin-couriers.js"></script>
+</body>
+</html>

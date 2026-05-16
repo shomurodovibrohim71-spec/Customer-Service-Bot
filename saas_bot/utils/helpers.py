@@ -166,6 +166,7 @@ def admin_reply_keyboard(tenant, lang: str) -> ReplyKeyboardMarkup:
         [KeyboardButton(L("add_branch")),    KeyboardButton(L("orders"))],
         [KeyboardButton(L("stats")),         KeyboardButton(L("promos"))],
         [KeyboardButton(L("feedback_list")), KeyboardButton(L("about_us"))],
+        [KeyboardButton(L("users")),         KeyboardButton(L("couriers"))],
         [KeyboardButton(L("broadcast")),     KeyboardButton(L("user_view"))],
     ]
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)

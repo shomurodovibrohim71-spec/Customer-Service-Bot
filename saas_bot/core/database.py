@@ -175,6 +175,18 @@ CREATE TABLE IF NOT EXISTS feedback_messages (
 );
 CREATE INDEX IF NOT EXISTS idx_feedback_msgs
     ON feedback_messages(tenant_id, feedback_id, id);
+
+CREATE TABLE IF NOT EXISTS couriers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tenant_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    telegram_id INTEGER,
+    is_active INTEGER DEFAULT 1,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_couriers_tenant
+    ON couriers(tenant_id, is_active);
 """
 
 # Idempotent column-level migrations. Run after the main schema so newly added
@@ -201,6 +213,8 @@ _MIGRATIONS = [
     ("products", "in_stock",    "INTEGER DEFAULT 1"),
     # Admin-set delivery fee per order (taxi cost etc.). Stored separately from product subtotal.
     ("orders",   "delivery_fee", "INTEGER DEFAULT 0"),
+    # Assigned courier FK (references couriers.id, nullable).
+    ("orders",   "courier_id",  "INTEGER"),
 ]
 
 
@@ -1161,3 +1175,86 @@ class Database:
             "cancelled": int((row or {}).get("cancelled", 0)),
             "top":       top,
         }
+
+    # -------------------------------------------------------------- couriers
+
+    async def list_couriers(self, active_only: bool = False) -> list[dict[str, Any]]:
+        q = "SELECT * FROM couriers WHERE tenant_id=?"
+        if active_only:
+            q += " AND is_active=1"
+        q += " ORDER BY name"
+        async with self.conn.execute(q, (self.tenant_id,)) as cur:
+            rows = await cur.fetchall()
+        return [dict(r) for r in rows]
+
+    async def get_courier(self, courier_id: int) -> dict[str, Any] | None:
+        async with self.conn.execute(
+            "SELECT * FROM couriers WHERE id=? AND tenant_id=?",
+            (courier_id, self.tenant_id),
+        ) as cur:
+            row = await cur.fetchone()
+        return dict(row) if row else None
+
+    async def add_courier(
+        self, name: str, phone: str, telegram_id: int | None = None,
+    ) -> int:
+        cur = await self.conn.execute(
+            """INSERT INTO couriers (tenant_id, name, phone, telegram_id, is_active, created_at)
+               VALUES (?, ?, ?, ?, 1, ?)""",
+            (self.tenant_id, name.strip(), phone.strip(), telegram_id, _now()),
+        )
+        await self.conn.commit()
+        return int(cur.lastrowid)
+
+    async def update_courier(
+        self, courier_id: int, name: str, phone: str, telegram_id: int | None = None,
+    ) -> bool:
+        cur = await self.conn.execute(
+            "UPDATE couriers SET name=?, phone=?, telegram_id=? WHERE id=? AND tenant_id=?",
+            (name.strip(), phone.strip(), telegram_id, courier_id, self.tenant_id),
+        )
+        await self.conn.commit()
+        return cur.rowcount > 0
+
+    async def toggle_courier_active(self, courier_id: int) -> bool | None:
+        async with self.conn.execute(
+            "SELECT is_active FROM couriers WHERE id=? AND tenant_id=?",
+            (courier_id, self.tenant_id),
+        ) as cur:
+            row = await cur.fetchone()
+        if row is None:
+            return None
+        new_val = 0 if row["is_active"] else 1
+        await self.conn.execute(
+            "UPDATE couriers SET is_active=? WHERE id=? AND tenant_id=?",
+            (new_val, courier_id, self.tenant_id),
+        )
+        await self.conn.commit()
+        return bool(new_val)
+
+    async def delete_courier(self, courier_id: int) -> bool:
+        cur = await self.conn.execute(
+            "DELETE FROM couriers WHERE id=? AND tenant_id=?",
+            (courier_id, self.tenant_id),
+        )
+        await self.conn.commit()
+        return cur.rowcount > 0
+
+    async def assign_courier(self, order_id: int, courier_id: int | None) -> bool:
+        """Assign (or unassign with None) a courier to an order."""
+        cur = await self.conn.execute(
+            "UPDATE orders SET courier_id=? WHERE id=? AND tenant_id=?",
+            (courier_id, order_id, self.tenant_id),
+        )
+        await self.conn.commit()
+        return cur.rowcount > 0
+
+    async def courier_orders(
+        self, courier_id: int, limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        async with self.conn.execute(
+            "SELECT * FROM orders WHERE tenant_id=? AND courier_id=? ORDER BY id DESC LIMIT ?",
+            (self.tenant_id, courier_id, limit),
+        ) as cur:
+            rows = await cur.fetchall()
+        return [dict(r) for r in rows]

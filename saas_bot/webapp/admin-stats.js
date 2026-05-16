@@ -119,23 +119,41 @@
     });
     $("hoursSection").classList.remove("hidden");
 
-    // --- Status breakdown ------------------------------------------------
-    const sl = $("statusList");
-    sl.innerHTML = "";
+    // --- Status pie chart ------------------------------------------------
     const entries = Object.entries(d.by_status || {});
-    if (!entries.length) {
-      sl.innerHTML = `<div class="info">${T("no_orders")}</div>`;
-    } else {
-      entries.forEach(([st, n], i) => {
-        const row = document.createElement("div");
-        row.className = "top-row";
-        row.innerHTML = `
-          <span class="top-rank">${i + 1}</span>
-          <span class="top-name">${escapeHtml(statusLabel(st))}</span>
-          <span class="top-qty">${fmtN(n)} ${T("qty_suffix")}</span>
-        `;
-        sl.appendChild(row);
+    if (entries.length) {
+      const COLORS = {
+        pending:    "#f59e0b",
+        confirmed:  "#3b82f6",
+        preparing:  "#8b5cf6",
+        on_the_way: "#06b6d4",
+        delivered:  "#22c55e",
+        cancelled:  "#ef4444",
+      };
+      const labels = entries.map(([st]) => statusLabel(st));
+      const values = entries.map(([, n]) => n);
+      const colors = entries.map(([st]) => COLORS[st] || "#888");
+
+      const canvas = $("statusChart");
+      if (window._statusChart) window._statusChart.destroy();
+      window._statusChart = new Chart(canvas, {
+        type: "doughnut",
+        data: { labels, datasets: [{ data: values, backgroundColor: colors, borderWidth: 0, hoverOffset: 6 }] },
+        options: {
+          cutout: "60%",
+          plugins: { legend: { display: false }, tooltip: {
+            callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed}` }
+          }},
+        },
       });
+
+      const legend = $("chartLegend");
+      legend.innerHTML = entries.map(([st, n], i) => `
+        <div class="chart-legend-item">
+          <span class="legend-dot" style="background:${colors[i]}"></span>
+          ${escapeHtml(labels[i])}: ${fmtN(n)}
+        </div>
+      `).join("");
     }
     $("statusSection").classList.remove("hidden");
   }

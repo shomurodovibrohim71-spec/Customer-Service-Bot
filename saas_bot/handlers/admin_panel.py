@@ -156,6 +156,10 @@ async def admin_router(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await _open_admin_webapp(update, context, tenant, "feedback", lang)
     elif action == "about_us":
         await _open_admin_webapp(update, context, tenant, "company", lang)
+    elif action == "users":
+        await _open_admin_webapp(update, context, tenant, "users", lang)
+    elif action == "couriers":
+        await _open_admin_webapp(update, context, tenant, "couriers", lang)
     elif action == "broadcast":
         # Entry point for the broadcast conversation - see register().
         # Sending the prompt here in case the conversation isn't triggered.
@@ -196,6 +200,16 @@ _ADMIN_WEBAPP_LABELS = {
         "uz": ("🛒 Buyurtmalar paneli",   "🛒 Pastdagi tugmani bosing — buyurtmalar dashboard ochiladi."),
         "en": ("🛒 Orders dashboard",     "🛒 Tap the button below — the orders dashboard will open."),
         "ru": ("🛒 Панель заказов",       "🛒 Нажмите кнопку ниже — откроется панель заказов."),
+    },
+    "users": {
+        "uz": ("👥 Mijozlar bazasi",       "👥 Pastdagi tugmani bosing — mijozlar ro'yxati ochiladi."),
+        "en": ("👥 Customer database",     "👥 Tap the button below — the customer list will open."),
+        "ru": ("👥 База клиентов",         "👥 Нажмите кнопку ниже — откроется список клиентов."),
+    },
+    "couriers": {
+        "uz": ("🚗 Kuryerlar paneli",      "🚗 Pastdagi tugmani bosing — kuryerlar boshqaruvi ochiladi."),
+        "en": ("🚗 Couriers panel",        "🚗 Tap the button below — the couriers panel will open."),
+        "ru": ("🚗 Панель курьеров",       "🚗 Нажмите кнопку ниже — откроется панель управления курьерами."),
     },
 }
 _NO_WEBAPP = {

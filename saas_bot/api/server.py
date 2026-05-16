@@ -176,6 +176,16 @@ async def webapp_admin_branches() -> FileResponse:
     return _webapp_file("admin-branches.html")
 
 
+@app.get("/webapp/admin/users")
+async def webapp_admin_users() -> FileResponse:
+    return _webapp_file("admin-users.html")
+
+
+@app.get("/webapp/admin/couriers")
+async def webapp_admin_couriers() -> FileResponse:
+    return _webapp_file("admin-couriers.html")
+
+
 def _check_admin(tenant: Tenant, init_data: str, fallback_uid: int | None) -> int:
     """Resolve current user_id from either initData (preferred) or URL uid fallback,
     then verify they are an admin for this tenant. Returns the user_id or raises 401/403."""
@@ -1670,3 +1680,141 @@ async def tenant_stats(tenant_id: str):
         "messages": await db.message_stats(),
         "orders": await db.count_orders_by_status(),
     }
+
+
+# ============================================================ Couriers API
+
+class CourierIn(BaseModel):
+    name: str
+    phone: str
+    telegram_id: int | None = None
+
+
+@app.get("/api/admin/couriers")
+async def api_list_couriers(
+    tenant: str,
+    init_data: str = "",
+    uid: int | None = None,
+    active_only: bool = False,
+) -> dict[str, Any]:
+    t = get_tenant(tenant)
+    _check_admin(t, init_data, uid)
+    db = get_db(tenant)
+    couriers = await db.list_couriers(active_only=active_only)
+    return {"couriers": couriers, "total": len(couriers)}
+
+
+@app.post("/api/admin/couriers")
+async def api_add_courier(
+    body: CourierIn,
+    tenant: str,
+    init_data: str = "",
+    uid: int | None = None,
+) -> dict[str, Any]:
+    t = get_tenant(tenant)
+    _check_admin(t, init_data, uid)
+    db = get_db(tenant)
+    courier_id = await db.add_courier(body.name, body.phone, body.telegram_id)
+    return {"ok": True, "id": courier_id}
+
+
+@app.put("/api/admin/couriers/{courier_id}")
+async def api_update_courier(
+    courier_id: int,
+    body: CourierIn,
+    tenant: str,
+    init_data: str = "",
+    uid: int | None = None,
+) -> dict[str, Any]:
+    t = get_tenant(tenant)
+    _check_admin(t, init_data, uid)
+    db = get_db(tenant)
+    ok = await db.update_courier(courier_id, body.name, body.phone, body.telegram_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="courier not found")
+    return {"ok": True}
+
+
+@app.post("/api/admin/couriers/{courier_id}/toggle")
+async def api_toggle_courier(
+    courier_id: int,
+    tenant: str,
+    init_data: str = "",
+    uid: int | None = None,
+) -> dict[str, Any]:
+    t = get_tenant(tenant)
+    _check_admin(t, init_data, uid)
+    db = get_db(tenant)
+    new_state = await db.toggle_courier_active(courier_id)
+    if new_state is None:
+        raise HTTPException(status_code=404, detail="courier not found")
+    return {"ok": True, "is_active": new_state}
+
+
+@app.delete("/api/admin/couriers/{courier_id}")
+async def api_delete_courier(
+    courier_id: int,
+    tenant: str,
+    init_data: str = "",
+    uid: int | None = None,
+) -> dict[str, Any]:
+    t = get_tenant(tenant)
+    _check_admin(t, init_data, uid)
+    db = get_db(tenant)
+    ok = await db.delete_courier(courier_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="courier not found")
+    return {"ok": True}
+
+
+class AssignCourierIn(BaseModel):
+    order_id: int
+    courier_id: int | None = None
+
+
+@app.post("/api/admin/orders/assign-courier")
+async def api_assign_courier(
+    body: AssignCourierIn,
+    tenant: str,
+    init_data: str = "",
+    uid: int | None = None,
+) -> dict[str, Any]:
+    t = get_tenant(tenant)
+    _check_admin(t, init_data, uid)
+    db = get_db(tenant)
+    ok = await db.assign_courier(body.order_id, body.courier_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="order not found")
+    # Notify courier via Telegram if telegram_id is set
+    if body.courier_id:
+        courier = await db.get_courier(body.courier_id)
+        order = await db.get_order(body.order_id)
+        if courier and order and courier.get("telegram_id"):
+            try:
+                import httpx as _httpx
+                token = t.bot_token
+                tg_id = courier["telegram_id"]
+                addr = order.get("address") or order.get("branch") or "—"
+                items_txt = ""
+                import json as _json
+                try:
+                    items = _json.loads(order.get("items_json") or "[]")
+                    items_txt = ", ".join(
+                        f"{i.get('name','?')} x{i.get('qty',1)}" for i in items
+                    )
+                except Exception:
+                    pass
+                msg = (
+                    f"🚗 *Yangi buyurtma #{order['id']}*\n"
+                    f"📍 Manzil: {addr}\n"
+                    f"🍽 {items_txt}\n"
+                    f"💵 {order.get('amount', 0):,} so'm"
+                )
+                async with _httpx.AsyncClient(timeout=8) as hc:
+                    await hc.post(
+                        f"https://api.telegram.org/bot{token}/sendMessage",
+                        json={"chat_id": tg_id, "text": msg, "parse_mode": "Markdown"},
+                    )
+            except Exception:
+                pass
+    return {"ok": True}
