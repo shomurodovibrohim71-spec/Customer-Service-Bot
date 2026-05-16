@@ -225,6 +225,33 @@
 
     .ao-empty { text-align: center; padding: 64px 20px; color: var(--text-muted); font-size: 15px; }
     .ao-empty-icon { font-size: 48px; margin-bottom: 12px; }
+
+    /* Fee modal */
+    .fee-modal-bg {
+      position: fixed; inset: 0; z-index: 100;
+      background: rgba(0,0,0,0.65); backdrop-filter: blur(6px);
+      display: flex; align-items: center; justify-content: center;
+      padding: 20px;
+    }
+    .fee-modal-bg.hidden { display: none; }
+    .fee-modal {
+      background: var(--surface); border: 1px solid var(--line);
+      border-radius: var(--r-lg); padding: 24px 20px;
+      width: 100%; max-width: 340px;
+      display: flex; flex-direction: column; gap: 14px;
+    }
+    .fee-modal-title { font-size: 18px; font-weight: 800; }
+    .fee-modal-sub   { font-size: 13px; color: var(--text-muted); margin-top: -8px; }
+    .fee-input {
+      width: 100%; padding: 14px 16px; font-size: 20px; font-weight: 700;
+      background: var(--bg); border: 2px solid var(--brand);
+      border-radius: var(--r-md); color: var(--text);
+      text-align: center; letter-spacing: .04em;
+      box-sizing: border-box;
+    }
+    .fee-input:focus { outline: none; }
+    .fee-modal-hint { font-size: 12px; color: var(--text-muted); text-align: center; min-height: 16px; }
+    .fee-modal-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   </style>
 </head>
 <body>
@@ -272,6 +299,20 @@
     <div class="loading" data-t="loading">Yuklanmoqda…</div>
   </div>
 
+  <!-- Fee confirmation modal -->
+  <div id="feeModal" class="fee-modal-bg hidden">
+    <div class="fee-modal">
+      <div class="fee-modal-title" id="feeModalTitle">🚗 Yetkazib berish narxi</div>
+      <div class="fee-modal-sub" id="feeModalSub">Taksi/kuryer xarajatini kiriting</div>
+      <input id="feeInput" type="number" class="fee-input" min="0" step="1000" placeholder="0">
+      <div class="fee-modal-hint" id="feeModalHint"></div>
+      <div class="fee-modal-btns">
+        <button class="ghost-btn" id="feeCancelBtn">Bekor</button>
+        <button class="primary-btn" id="feeConfirmBtn">✅ Tasdiqlash</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Detail screen -->
   <section id="detailScreen" class="screen hidden">
     <header class="screen-header">
@@ -303,6 +344,10 @@
         act_confirm: "✅ Tasdiqlash", act_prepare: "👨‍🍳 Tayyorlanmoqda",
         act_on_way: "🚗 Yo'lda", act_delivered: "📦 Yetkazildi", act_cancel: "❌ Bekor qilish",
         confirm_cancel: "Buyurtma #{id} bekor qilinsinmi?",
+        fee_modal_title: "🚗 Yetkazib berish narxi",
+        fee_modal_sub: "Taksi/kuryer xarajatini kiriting (0 = bepul)",
+        fee_modal_hint: "Mahsulotlar: {sub} so'm → Jami: {total} so'm",
+        fee_confirm_btn: "✅ Tasdiqlash va yuborish",
         soum: "so'm", x_qty: "× {q}", updated: "✅ Yangilandi", view_details: "Batafsil →",
         lbl_note_courier: "🚗 Kuryerga", lbl_note_rest: "🍴 Restoranga",
         delivery_delivery: "🚚 Yetkazib berish", delivery_pickup: "🚶 Olib ketish",
@@ -324,6 +369,10 @@
         act_confirm: "✅ Confirm", act_prepare: "👨‍🍳 Preparing",
         act_on_way: "🚗 On the way", act_delivered: "📦 Mark delivered", act_cancel: "❌ Cancel",
         confirm_cancel: "Cancel order #{id}?",
+        fee_modal_title: "🚗 Delivery fee",
+        fee_modal_sub: "Enter taxi/courier cost (0 = free)",
+        fee_modal_hint: "Products: {sub} so'm → Total: {total} so'm",
+        fee_confirm_btn: "✅ Confirm & notify",
         soum: "so'm", x_qty: "× {q}", updated: "✅ Updated", view_details: "Details →",
         lbl_note_courier: "🚗 For courier", lbl_note_rest: "🍴 For restaurant",
         delivery_delivery: "🚚 Delivery", delivery_pickup: "🚶 Pickup",
@@ -345,6 +394,10 @@
         act_confirm: "✅ Подтвердить", act_prepare: "👨‍🍳 Готовится",
         act_on_way: "🚗 В пути", act_delivered: "📦 Доставлен", act_cancel: "❌ Отменить",
         confirm_cancel: "Отменить заказ #{id}?",
+        fee_modal_title: "🚗 Стоимость доставки",
+        fee_modal_sub: "Введите стоимость такси/курьера (0 = бесплатно)",
+        fee_modal_hint: "Товары: {sub} сум → Итого: {total} сум",
+        fee_confirm_btn: "✅ Подтвердить и отправить",
         soum: "сум", x_qty: "× {q}", updated: "✅ Обновлено", view_details: "Детали →",
         lbl_note_courier: "🚗 Курьеру", lbl_note_rest: "🍴 Ресторану",
         delivery_delivery: "🚚 Доставка", delivery_pickup: "🚶 Самовывоз",

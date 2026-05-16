@@ -199,6 +199,8 @@ _MIGRATIONS = [
     ("branches", "is_open",     "INTEGER DEFAULT 1"),
     # Product stock: 1 = available, 0 = out of stock (shown grayed out, can't add to cart).
     ("products", "in_stock",    "INTEGER DEFAULT 1"),
+    # Admin-set delivery fee per order (taxi cost etc.). Stored separately from product subtotal.
+    ("orders",   "delivery_fee", "INTEGER DEFAULT 0"),
 ]
 
 
@@ -476,6 +478,27 @@ class Database:
         )
         await self.conn.commit()
         return cur.rowcount > 0
+
+    async def set_order_delivery_fee(self, order_id: int, delivery_fee: int) -> int | None:
+        """Set delivery_fee and return new total. Recalculates amount from items_json."""
+        import json as _json
+        async with self.conn.execute(
+            "SELECT items_json, discount FROM orders WHERE id=? AND tenant_id=?",
+            (order_id, self.tenant_id),
+        ) as cur:
+            row = await cur.fetchone()
+        if row is None:
+            return None
+        items = _json.loads(row["items_json"] or "[]")
+        subtotal = sum(int(i.get("qty", 1)) * int(i.get("price", 0)) for i in items)
+        discount = int(row["discount"] or 0)
+        new_amount = max(0, subtotal + delivery_fee - discount)
+        await self.conn.execute(
+            "UPDATE orders SET delivery_fee=?, amount=? WHERE id=? AND tenant_id=?",
+            (delivery_fee, new_amount, order_id, self.tenant_id),
+        )
+        await self.conn.commit()
+        return new_amount
 
     async def get_order(self, order_id: int) -> dict[str, Any] | None:
         async with self.conn.execute(

@@ -231,7 +231,21 @@
         } catch (err) { alert("⚠️ " + err.message); btn.disabled = false; }
       };
     };
-    wireQuick(".qa-confirm", "confirmed");
+    // Confirm: open fee modal
+    const qaConfirmBtn = el.querySelector(".qa-confirm");
+    if (qaConfirmBtn) {
+      qaConfirmBtn.onclick = async (e) => {
+        e.stopPropagation();
+        openFeeModal(o, async (fee) => {
+          qaConfirmBtn.disabled = true;
+          try {
+            await api("POST", "/api/admin/orders/confirm-with-fee", { order_id: o.id, delivery_fee: fee });
+            if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
+            await load();
+          } catch (err) { alert("⚠️ " + err.message); qaConfirmBtn.disabled = false; }
+        });
+      };
+    }
     wireQuick(".qa-prepare", "preparing");
     wireQuick(".qa-on-way",  "on_the_way");
     wireQuick(".qa-deliver", "delivered");
@@ -379,12 +393,89 @@
         } finally { btn.disabled = false; }
       };
     };
-    setAct(".act-confirm",   "confirmed");
+    // "Tasdiqlash" → open fee modal first
+    const confirmBtn = $("detailBody").querySelector(".act-confirm");
+    if (confirmBtn) {
+      confirmBtn.onclick = () => openFeeModal(o, async (fee) => {
+        confirmBtn.disabled = true;
+        try {
+          await api("POST", "/api/admin/orders/confirm-with-fee", { order_id: o.id, delivery_fee: fee });
+          if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
+          await load();
+          const fresh = state.all.find(x => x.id === o.id);
+          if (fresh) renderDetail(fresh);
+        } catch (e) {
+          const errEl = $("detailErr");
+          if (errEl) { errEl.textContent = "⚠️ " + e.message; errEl.classList.remove("hidden"); }
+        } finally { confirmBtn.disabled = false; }
+      });
+    }
     setAct(".act-prepare",   "preparing");
     setAct(".act-on-way",    "on_the_way");
     setAct(".act-delivered", "delivered");
     setAct(".act-cancel",    "cancelled", "confirm_cancel");
   }
+
+  // ── Fee modal ────────────────────────────────────────────────────────────
+  let _feeCallback = null;
+
+  function calcSubtotal(o) {
+    return (o.items || []).reduce((s, i) => s + (i.qty * i.price), 0);
+  }
+
+  function openFeeModal(o, callback) {
+    _feeCallback = callback;
+    const sub = calcSubtotal(o);
+    const disc = o.discount || 0;
+    $("feeModalTitle").textContent = T("fee_modal_title");
+    $("feeModalSub").textContent = T("fee_modal_sub");
+    $("feeInput").value = "";
+    updateFeeHint(sub, disc, 0);
+    $("feeInput").oninput = () => {
+      const fee = parseInt($("feeInput").value) || 0;
+      updateFeeHint(sub, disc, fee);
+    };
+    $("feeConfirmBtn").textContent = T("fee_confirm_btn");
+    $("feeModal").classList.remove("hidden");
+    setTimeout(() => $("feeInput").focus(), 50);
+  }
+
+  function updateFeeHint(sub, disc, fee) {
+    const total = Math.max(0, sub + fee - disc);
+    $("feeModalHint").textContent = tfmt("fee_modal_hint", {
+      sub: new Intl.NumberFormat("uz-UZ").format(sub),
+      total: new Intl.NumberFormat("uz-UZ").format(total),
+    });
+  }
+
+  function closeFeeModal() {
+    $("feeModal").classList.add("hidden");
+    _feeCallback = null;
+  }
+
+  $("feeCancelBtn").onclick = closeFeeModal;
+  $("feeModal").onclick = (e) => { if (e.target === $("feeModal")) closeFeeModal(); };
+
+  $("feeConfirmBtn").onclick = async () => {
+    const fee = parseInt($("feeInput").value) || 0;
+    const cb = _feeCallback;
+    closeFeeModal();
+    if (cb) await cb(fee);
+  };
+
+  // Quick-action confirm on card also opens modal
+  const _origWireQuick = (el, status) => {
+    if (!el) return;
+    el.onclick = async (e) => {
+      e.stopPropagation();
+      el.disabled = true;
+      try {
+        await api("POST", "/api/admin/orders/status", { order_id: parseInt(el.closest("[data-oid]")?.dataset.oid || 0), status });
+        if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
+        await load();
+      } catch (err) { alert("⚠️ " + err.message); el.disabled = false; }
+    };
+  };
 
   $("detailBack").onclick = () => closeScreen("detailScreen");
 

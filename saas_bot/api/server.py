@@ -1165,6 +1165,73 @@ class AdminOrderStatusIn(BaseModel):
     status: str  # 'confirmed' | 'cancelled' | 'delivered' | 'pending'
 
 
+class AdminConfirmWithFeeIn(BaseModel):
+    init_data: str = ""
+    fallback_uid: int | None = None
+    tenant_id: str
+    order_id: int
+    delivery_fee: int = 0  # taxi/courier cost set by admin
+
+
+@app.post("/api/admin/orders/confirm-with-fee")
+async def api_admin_orders_confirm_with_fee(payload: AdminConfirmWithFeeIn) -> dict[str, Any]:
+    """Admin confirms an order with a custom delivery fee (taxi cost etc.)."""
+    t = get_tenant(payload.tenant_id)
+    _check_admin(t, payload.init_data, payload.fallback_uid)
+    db = get_db(payload.tenant_id)
+    order = await db.get_order(payload.order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="order not found")
+
+    # Update delivery fee and recalculate total.
+    new_amount = await db.set_order_delivery_fee(payload.order_id, max(0, payload.delivery_fee))
+    if new_amount is None:
+        raise HTTPException(status_code=404, detail="order not found")
+
+    # Confirm the order.
+    await db.set_order_status(payload.order_id, "confirmed")
+
+    # Notify customer with updated total.
+    u = await db.get_user(int(order["user_id"]))
+    cust_lang = (u or {}).get("language") or t.default_language
+    oid = payload.order_id
+    fee = max(0, payload.delivery_fee)
+    fee_fmt = f"{fee:,}".replace(",", " ")
+    amt_fmt  = f"{new_amount:,}".replace(",", " ")
+    msg = {
+        "uz": (
+            f"✅ Buyurtmangiz #{oid} tasdiqlandi!\n"
+            f"🚗 Yetkazib berish: {fee_fmt} so'm\n"
+            f"💰 Jami to'lov: *{amt_fmt} so'm*\n"
+            f"Tez orada kuryer yo'lga chiqadi 🙏"
+        ),
+        "en": (
+            f"✅ Your order #{oid} is confirmed!\n"
+            f"🚗 Delivery: {fee_fmt} so'm\n"
+            f"💰 Total: *{amt_fmt} so'm*\n"
+            f"The courier will be on the way soon 🙏"
+        ),
+        "ru": (
+            f"✅ Ваш заказ #{oid} подтверждён!\n"
+            f"🚗 Доставка: {fee_fmt} сум\n"
+            f"💰 Итого: *{amt_fmt} сум*\n"
+            f"Курьер скоро выедет 🙏"
+        ),
+    }.get(cust_lang, "")
+
+    if msg:
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                await client.post(
+                    f"https://api.telegram.org/bot{t.bot_token}/sendMessage",
+                    json={"chat_id": int(order["user_id"]), "text": msg, "parse_mode": "Markdown"},
+                )
+        except httpx.HTTPError as exc:
+            logger.warning("[%s] confirm-with-fee notify failed: %s", t.id, exc)
+
+    return {"ok": True, "new_amount": new_amount}
+
+
 @app.post("/api/admin/orders/status")
 async def api_admin_orders_status(payload: AdminOrderStatusIn) -> dict[str, Any]:
     """Admin updates an order's status. Notifies the customer in their language."""

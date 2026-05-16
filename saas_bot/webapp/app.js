@@ -408,7 +408,9 @@
       b.classList.add("active");
       state.paymentMethod = b.dataset.pay;
       const cardInfo = $("checkoutCardInfo");
-      if (cardInfo) cardInfo.classList.toggle("hidden", b.dataset.pay !== "card");
+      if (cardInfo && !cardInfo.dataset.noCard) {
+        cardInfo.classList.toggle("hidden", b.dataset.pay !== "card");
+      }
     };
   });
 
@@ -418,10 +420,15 @@
     if (!picker) return;
     picker.innerHTML = "";
     const openBranches = state.menu.branches.filter(b => b.is_open !== 0);
-    // Also pre-fill card number if available
+    // Pre-fill card number; hide card info section if no number configured
     const cardNumEl = $("checkoutCardNum");
-    if (cardNumEl && state.menu.card_number) {
-      cardNumEl.textContent = state.menu.card_number;
+    const cardInfoSec = $("checkoutCardInfo");
+    if (state.menu.card_number) {
+      if (cardNumEl) cardNumEl.textContent = state.menu.card_number;
+    } else {
+      // No card number → hide card payment option entirely
+      if (cardInfoSec) cardInfoSec.dataset.noCard = "1";
+      document.querySelectorAll('.seg-btn[data-pay="card"]').forEach(b => b.style.display = "none");
     }
     openBranches.forEach((b, idx) => {
       const card = document.createElement("div");
