@@ -1173,6 +1173,55 @@ class Database:
         ranked = sorted(counts.items(), key=lambda kv: kv[1])[:limit]
         return [{"name": n, "qty": q} for n, q in ranked]
 
+    async def revenue_by_category(self) -> list[dict[str, Any]]:
+        """Revenue per product category, computed from items_json qty×price."""
+        import json as _json
+        async with self.conn.execute(
+            "SELECT id, name, category FROM products WHERE tenant_id=?",
+            (self.tenant_id,),
+        ) as cur:
+            prod_rows = await cur.fetchall()
+        id_to_cat  = {r["id"]: r["category"] for r in prod_rows}
+        name_to_cat = {r["name"]: r["category"] for r in prod_rows}
+
+        cat_rev: dict[str, int] = {}
+        async with self.conn.execute(
+            """SELECT items_json FROM orders
+               WHERE tenant_id=? AND status != 'cancelled'
+                 AND items_json IS NOT NULL AND items_json != ''""",
+            (self.tenant_id,),
+        ) as cur:
+            rows = await cur.fetchall()
+        for r in rows:
+            try:
+                items = _json.loads(r["items_json"])
+            except (_json.JSONDecodeError, TypeError, ValueError):
+                continue
+            for it in items or []:
+                pid   = it.get("product_id")
+                name  = it.get("name") or ""
+                qty   = int(it.get("qty") or 0)
+                price = int(it.get("price") or 0)
+                cat   = id_to_cat.get(pid) or name_to_cat.get(name) or "Boshqa"
+                if qty and price:
+                    cat_rev[cat] = cat_rev.get(cat, 0) + qty * price
+        ranked = sorted(cat_rev.items(), key=lambda x: x[1], reverse=True)
+        return [{"category": c, "revenue": r} for c, r in ranked]
+
+    async def repeat_customers(self) -> dict[str, Any]:
+        """Count customers with 2+ orders (repeat buyers) and their percentage."""
+        async with self.conn.execute(
+            """SELECT user_id, COUNT(*) AS cnt FROM orders
+               WHERE tenant_id=? AND status != 'cancelled'
+               GROUP BY user_id""",
+            (self.tenant_id,),
+        ) as cur:
+            rows = await cur.fetchall()
+        total  = len(rows)
+        repeat = sum(1 for r in rows if r["cnt"] >= 2)
+        pct    = round(repeat / total * 100) if total else 0
+        return {"total": total, "repeat": repeat, "pct": pct}
+
     async def peak_hours(self) -> list[int]:
         """Return order counts per hour-of-day (24 values, index 0..23)."""
         buckets = [0] * 24

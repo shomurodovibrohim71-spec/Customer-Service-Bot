@@ -1399,11 +1399,20 @@ async def api_admin_stats(
         bottom = await db.bottom_products(limit=5)
     except Exception:
         bottom = []
+    try:
+        cat_revenue = await db.revenue_by_category()
+    except Exception:
+        cat_revenue = []
+    try:
+        repeat = await db.repeat_customers()
+    except Exception:
+        repeat = {"total": 0, "repeat": 0, "pct": 0}
     return {
         **summary,
         "daily": daily, "top_products": top, "bottom_products": bottom,
         "peak_hours": hours, "by_status": by_status,
         "users_total": users_total, "users_today": users_today,
+        "cat_revenue": cat_revenue, "repeat_customers": repeat,
         "tenant_name": t.name,
     }
 

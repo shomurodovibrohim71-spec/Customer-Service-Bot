@@ -143,6 +143,80 @@
     }
     $("topSection").classList.remove("hidden");
 
+    // --- Revenue by category chart ------------------------------------
+    if ((d.cat_revenue || []).length) {
+      const cr = d.cat_revenue;
+      const crLabels = cr.map(x => x.category.length > 20 ? x.category.slice(0, 19) + "…" : x.category);
+      const crData   = cr.map(x => x.revenue);
+      const crMax    = Math.max(...crData, 1);
+      const crColors = crData.map(v => `rgba(255,122,24,${(0.25 + 0.75 * v / crMax).toFixed(2)})`);
+      const chartH   = Math.max(160, cr.length * 36);
+      $("catRevChartWrap").style.height = chartH + "px";
+      if (window._catRevChart) window._catRevChart.destroy();
+      window._catRevChart = new Chart($("catRevChart"), {
+        type: "bar",
+        data: {
+          labels: crLabels,
+          datasets: [{
+            data: crData,
+            backgroundColor: crColors,
+            borderRadius: 6,
+            borderSkipped: false,
+          }],
+        },
+        options: {
+          indexAxis: "y",
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: ctx => ` ${new Intl.NumberFormat("uz-UZ").format(ctx.parsed.x)} so'm`,
+              },
+            },
+          },
+          scales: {
+            x: {
+              beginAtZero: true,
+              grid: { color: "rgba(255,255,255,0.06)" },
+              border: { display: false },
+              ticks: {
+                color: "rgba(255,255,255,0.35)",
+                font: { size: 10 },
+                callback: v => v === 0 ? "0" : Math.round(v / 1000) + "k",
+              },
+            },
+            y: {
+              grid: { display: false },
+              border: { display: false },
+              ticks: { color: "rgba(255,255,255,0.75)", font: { size: 12, weight: "600" } },
+            },
+          },
+        },
+      });
+      $("catRevSection").classList.remove("hidden");
+    }
+
+    // --- Repeat customers --------------------------------------------
+    const rc = d.repeat_customers || { total: 0, repeat: 0, pct: 0 };
+    if (rc.total > 0) {
+      const box = $("repeatStats");
+      box.innerHTML = `
+        <div class="repeat-wrap">
+          <div class="repeat-big">${rc.pct}%</div>
+          <div class="repeat-right">
+            <div class="repeat-label">${rc.repeat} ${T("repeat_of")} ${rc.total} ${T("repeat_buyers")}</div>
+            <div class="repeat-bar-wrap">
+              <div class="repeat-bar" style="width:${rc.pct}%"></div>
+            </div>
+            <div class="repeat-sub">2 yoki undan ko'p buyurtma bergan mijozlar</div>
+          </div>
+        </div>
+      `;
+      $("repeatSection").classList.remove("hidden");
+    }
+
     // --- Bottom (least sold) products chart ------------------------------
     if ((d.bottom_products || []).length) {
       const bp = d.bottom_products;

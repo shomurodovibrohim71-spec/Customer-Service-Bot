@@ -28,6 +28,15 @@
       text-align: center; line-height: 1.5;
     }
     .bottom-hint strong { color: #f87171; }
+
+    /* Repeat customers */
+    .repeat-wrap { display: flex; align-items: center; gap: 16px; padding: 4px 0 8px; }
+    .repeat-big  { font-size: 52px; font-weight: 900; color: #ff7a18; line-height: 1; flex-shrink: 0; }
+    .repeat-right { flex: 1; }
+    .repeat-label { font-size: 13px; color: var(--text); font-weight: 600; margin-bottom: 8px; }
+    .repeat-bar-wrap { height: 8px; background: rgba(255,255,255,0.08); border-radius: 999px; overflow: hidden; }
+    .repeat-bar { height: 100%; border-radius: 999px; background: #ff7a18; transition: width .7s cubic-bezier(.22,.68,0,1.2); }
+    .repeat-sub { font-size: 11px; color: var(--text-muted); margin-top: 5px; }
   </style>
 </head>
 <body>
@@ -73,6 +82,16 @@
       <div id="topList" class="top-list"></div>
     </section>
 
+    <section id="catRevSection" class="dash-section hidden">
+      <h3 data-t="s_cat_revenue">🗂 Toifa bo'yicha daromad</h3>
+      <div id="catRevChartWrap" style="position:relative;width:100%"><canvas id="catRevChart"></canvas></div>
+    </section>
+
+    <section id="repeatSection" class="dash-section hidden">
+      <h3 data-t="s_repeat">🔁 Qaytuvchi mijozlar</h3>
+      <div id="repeatStats"></div>
+    </section>
+
     <section id="hoursSection" class="dash-section hidden">
       <h3 data-t="s_hours">🕐 Buyurtmalar pikida (24 soat)</h3>
       <div style="position:relative;width:100%;height:160px"><canvas id="peakChart"></canvas></div>
@@ -101,6 +120,9 @@
         s_hours: "🕐 Buyurtmalar pikida (24 soat)", s_status: "📋 Status bo'yicha",
         s_bottom: "📉 Kam sotilayotgan mahsulotlar", bottom_never: "Hali sotilmagan",
         peak_label: "🔥 Eng band vaqt", peak_orders: "ta buyurtma", no_peak: "Ma'lumot yo'q",
+        s_cat_revenue: "🗂 Toifa bo'yicha daromad",
+        s_repeat: "🔁 Qaytuvchi mijozlar",
+        repeat_of: "ta mijozdan", repeat_buyers: "si qayta buyurtma bergan",
         orders_count: "{n} ta buyurtma", users_today: "bugun: {n}",
         no_orders_yet: "Hozircha buyurtmalar yo'q", no_products_yet: "Hozircha sotilgan mahsulotlar yo'q",
         no_orders: "Buyurtmalar yo'q", qty_suffix: "ta",
@@ -116,6 +138,9 @@
         s_hours: "🕐 Peak hours (24h)", s_status: "📋 By status",
         s_bottom: "📉 Least-sold products", bottom_never: "Never sold",
         peak_label: "🔥 Busiest hour", peak_orders: "orders", no_peak: "No data",
+        s_cat_revenue: "🗂 Revenue by category",
+        s_repeat: "🔁 Repeat customers",
+        repeat_of: "of", repeat_buyers: "customers ordered again",
         orders_count: "{n} orders", users_today: "today: {n}",
         no_orders_yet: "No orders yet", no_products_yet: "No products sold yet",
         no_orders: "No orders", qty_suffix: "pcs",
@@ -131,6 +156,9 @@
         s_hours: "🕐 Пиковые часы (24 ч)", s_status: "📋 По статусам",
         s_bottom: "📉 Мало продаваемые товары", bottom_never: "Не продавался",
         peak_label: "🔥 Пиковый час", peak_orders: "заказов", no_peak: "Нет данных",
+        s_cat_revenue: "🗂 Доход по категориям",
+        s_repeat: "🔁 Постоянные клиенты",
+        repeat_of: "из", repeat_buyers: "клиентов заказывают повторно",
         orders_count: "{n} заказов", users_today: "сегодня: {n}",
         no_orders_yet: "Заказов пока нет", no_products_yet: "Продаж пока нет",
         no_orders: "Заказов нет", qty_suffix: "шт",
@@ -141,7 +169,7 @@
       },
     };
   </script>
-  <script src="/static/i18n.js?v=20260517g"></script>
-  <script src="/static/admin-stats.js?v=20260517g"></script>
+  <script src="/static/i18n.js?v=20260517h"></script>
+  <script src="/static/admin-stats.js?v=20260517h"></script>
 </body>
 </html>
