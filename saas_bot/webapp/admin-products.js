@@ -107,27 +107,27 @@
   }
 
   function card(p) {
+    const isHidden = p.is_active === 0;
     const c = document.createElement("div");
-    c.className = "admin-prod-card" + (p.in_stock === 0 ? " out-of-stock" : "");
+    c.className = "admin-prod-card" + (isHidden ? " prod-hidden" : p.in_stock === 0 ? " out-of-stock" : "");
 
     // Image
-    const imgEl = document.createElement("div");
-    imgEl.className = p.image_url ? "prod-img" : "admin-prod-img-empty";
     if (p.image_url) {
       const im = document.createElement("img");
       im.className = "prod-img"; im.src = p.image_url; im.alt = p.name;
-      im.onerror = () => { imgEl.style.backgroundImage = "none"; imgEl.textContent = "🍔"; };
       c.appendChild(im);
     } else {
-      imgEl.textContent = "🍔";
-      c.appendChild(imgEl);
+      const ph = document.createElement("div");
+      ph.className = "admin-prod-img-empty"; ph.textContent = "🍔";
+      c.appendChild(ph);
     }
 
     // Body
     const body = document.createElement("div");
     body.className = "prod-body";
+    const hiddenBadge = isHidden ? `<span class="prod-hidden-badge">${T("hidden_label")}</span>` : "";
     body.innerHTML = `
-      <div class="prod-name">${escapeHtml(p.name)}</div>
+      <div class="prod-name">${escapeHtml(p.name)} ${hiddenBadge}</div>
       <div class="prod-price">${fmt(p.price_value)} so'm</div>`;
     c.appendChild(body);
 
@@ -135,50 +135,71 @@
     const actions = document.createElement("div");
     actions.className = "prod-actions";
 
-    // Stock toggle
-    const stockBtn = document.createElement("button");
-    stockBtn.className = "prod-btn " + (p.in_stock === 0 ? "prod-btn-stock-out" : "prod-btn-stock-in");
-    stockBtn.textContent = p.in_stock === 0 ? T("stock_out") : T("stock_in");
-    stockBtn.onclick = async (e) => {
-      e.stopPropagation();
-      stockBtn.disabled = true;
-      try {
-        const res = await api("POST", `/api/admin/products/${p.id}/toggle-stock`);
-        p.in_stock = res.in_stock ? 1 : 0;
-        c.className = "admin-prod-card" + (p.in_stock === 0 ? " out-of-stock" : "");
-        stockBtn.textContent = p.in_stock === 0 ? T("stock_out") : T("stock_in");
-        stockBtn.className = "prod-btn " + (p.in_stock === 0 ? "prod-btn-stock-out" : "prod-btn-stock-in");
-        if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred("light");
-      } catch (err) { alert("⚠️ " + err.message); }
-      finally { stockBtn.disabled = false; }
-    };
+    if (isHidden) {
+      // Yashirilgan: faqat "Faollashtirish" tugmasi ko'rsatilsin
+      const activateBtn = document.createElement("button");
+      activateBtn.className = "prod-btn prod-btn-activate";
+      activateBtn.textContent = T("btn_activate");
+      activateBtn.onclick = async (e) => {
+        e.stopPropagation(); activateBtn.disabled = true;
+        try {
+          await api("POST", `/api/admin/products/${p.id}/toggle-active`);
+          if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
+          await load();
+        } catch (err) { alert("⚠️ " + err.message); }
+        finally { activateBtn.disabled = false; }
+      };
+      const editBtn2 = document.createElement("button");
+      editBtn2.className = "prod-btn prod-btn-edit";
+      editBtn2.textContent = "✏️";
+      editBtn2.onclick = (e) => { e.stopPropagation(); openEdit(p); };
+      actions.appendChild(activateBtn);
+      actions.appendChild(editBtn2);
+    } else {
+      // Aktiv mahsulot: Stock toggle + Edit + Yashirish
+      const stockBtn = document.createElement("button");
+      stockBtn.className = "prod-btn " + (p.in_stock === 0 ? "prod-btn-stock-out" : "prod-btn-stock-in");
+      stockBtn.textContent = p.in_stock === 0 ? T("stock_out") : T("stock_in");
+      stockBtn.onclick = async (e) => {
+        e.stopPropagation(); stockBtn.disabled = true;
+        try {
+          const res = await api("POST", `/api/admin/products/${p.id}/toggle-stock`);
+          p.in_stock = res.in_stock ? 1 : 0;
+          c.className = "admin-prod-card" + (p.in_stock === 0 ? " out-of-stock" : "");
+          stockBtn.textContent = p.in_stock === 0 ? T("stock_out") : T("stock_in");
+          stockBtn.className = "prod-btn " + (p.in_stock === 0 ? "prod-btn-stock-out" : "prod-btn-stock-in");
+          if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred("light");
+        } catch (err) { alert("⚠️ " + err.message); }
+        finally { stockBtn.disabled = false; }
+      };
 
-    // Edit button
-    const editBtn = document.createElement("button");
-    editBtn.className = "prod-btn prod-btn-edit";
-    editBtn.textContent = "✏️ " + T("edit_title").replace("✏ ", "");
-    editBtn.onclick = (e) => { e.stopPropagation(); openEdit(p); };
+      const editBtn = document.createElement("button");
+      editBtn.className = "prod-btn prod-btn-edit";
+      editBtn.textContent = "✏️";
+      editBtn.onclick = (e) => { e.stopPropagation(); openEdit(p); };
 
-    // Delete button
-    const delBtn = document.createElement("button");
-    delBtn.className = "prod-btn prod-btn-del";
-    delBtn.textContent = "🗑";
-    delBtn.title = T("del_btn");
-    delBtn.onclick = async (e) => {
-      e.stopPropagation();
-      if (!confirm(tfmt("confirm_del_prod", { n: p.name }))) return;
-      delBtn.disabled = true;
-      try {
-        await api("DELETE", `/api/admin/products/${p.id}`, { id: p.id });
-        if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
-        await load();
-      } catch (err) { alert("⚠️ " + err.message); }
-      finally { delBtn.disabled = false; }
-    };
+      // Yashirish (deactivate) — menu'dan yashirish, o'chirish emas
+      const hideBtn = document.createElement("button");
+      hideBtn.className = "prod-btn prod-btn-hide";
+      hideBtn.textContent = T("btn_hide");
+      hideBtn.title = T("btn_hide_hint");
+      hideBtn.onclick = async (e) => {
+        e.stopPropagation();
+        if (!confirm(tfmt("confirm_hide", { n: p.name }))) return;
+        hideBtn.disabled = true;
+        try {
+          await api("POST", `/api/admin/products/${p.id}/toggle-active`);
+          if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
+          await load();
+        } catch (err) { alert("⚠️ " + err.message); }
+        finally { hideBtn.disabled = false; }
+      };
 
-    actions.appendChild(stockBtn);
-    actions.appendChild(editBtn);
-    actions.appendChild(delBtn);
+      actions.appendChild(stockBtn);
+      actions.appendChild(editBtn);
+      actions.appendChild(hideBtn);
+    }
+
     c.appendChild(actions);
     return c;
   }

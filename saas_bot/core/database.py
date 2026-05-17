@@ -706,12 +706,30 @@ class Database:
         return [dict(r) for r in rows]
 
     async def delete_product(self, product_id: int) -> bool:
+        """Soft-deactivate (is_active=0). Use toggle_product_active to reverse."""
         cur = await self.conn.execute(
             "UPDATE products SET is_active=0 WHERE id=? AND tenant_id=?",
             (product_id, self.tenant_id),
         )
         await self.conn.commit()
         return cur.rowcount > 0
+
+    async def toggle_product_active(self, product_id: int) -> bool | None:
+        """Toggle is_active 0↔1. Returns new is_active value, or None if not found."""
+        async with self.conn.execute(
+            "SELECT is_active FROM products WHERE id=? AND tenant_id=?",
+            (product_id, self.tenant_id),
+        ) as cur:
+            row = await cur.fetchone()
+        if row is None:
+            return None
+        new_val = 0 if row["is_active"] else 1
+        await self.conn.execute(
+            "UPDATE products SET is_active=? WHERE id=? AND tenant_id=?",
+            (new_val, product_id, self.tenant_id),
+        )
+        await self.conn.commit()
+        return bool(new_val)
 
     async def toggle_product_stock(self, product_id: int) -> bool | None:
         """Toggle in_stock 0↔1. Returns new in_stock value, or None if not found."""

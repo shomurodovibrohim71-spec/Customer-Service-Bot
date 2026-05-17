@@ -38,6 +38,14 @@
     .prod-btn-del  { background: rgba(255,93,93,.12); color: var(--danger); max-width: 36px; }
     .prod-btn-stock-in  { background: rgba(74,222,128,.12); color: #4ade80; }
     .prod-btn-stock-out { background: rgba(255,93,93,.12); color: var(--danger); }
+    .prod-btn-hide     { background: rgba(255,176,32,.12); color: var(--warning); max-width: 48px; }
+    .prod-btn-activate { background: rgba(74,222,128,.15); color: #4ade80; flex: 2; }
+    .admin-prod-card.prod-hidden { opacity: .5; border-style: dashed; }
+    .prod-hidden-badge {
+      display: inline-block; font-size: 9px; font-weight: 800;
+      background: rgba(255,93,93,.18); color: var(--danger);
+      padding: 1px 5px; border-radius: 4px; vertical-align: middle; margin-left: 3px;
+    }
 
     /* upsell toggle row */
     .upsell-row { display: flex; align-items: center; justify-content: space-between; background: var(--card, #1f232d); border-radius: 12px; padding: 11px 14px; }
@@ -133,6 +141,10 @@
         err_name: "Nom kerak", err_cat_req: "Toifa kerak", err_price: "Narx 0 dan katta bo'lsin",
         soum: "so'm", cnt_suffix: "ta",
         stock_in: "✅ Bor", stock_out: "❌ Tugadi",
+        btn_hide: "🙈", btn_hide_hint: "Menu'dan yashirish (o'chirish emas)",
+        btn_activate: "✅ Faollashtirish",
+        hidden_label: "YASHIRILGAN",
+        confirm_hide: "\"{n}\" ni menu'dan yashirasizmi? Admin paneldan qayta faollashtirish mumkin.",
         upsell_title: "➕ Savatcha qo'shimchalari",
         upsell_hint: "Qaysi toifalar savatchada \"Qo'shish\" bo'limida ko'rinishini belgilang.",
         upsell_on: "Qo'shimchada ko'rsatish",
@@ -155,6 +167,10 @@
         err_name: "Name required", err_cat_req: "Category required", err_price: "Price must be > 0",
         soum: "so'm", cnt_suffix: "pcs",
         stock_in: "✅ In stock", stock_out: "❌ Out of stock",
+        btn_hide: "🙈", btn_hide_hint: "Hide from menu (not deleted)",
+        btn_activate: "✅ Activate",
+        hidden_label: "HIDDEN",
+        confirm_hide: "Hide \"{n}\" from menu? You can reactivate it from admin panel.",
         upsell_title: "➕ Cart add-ons",
         upsell_hint: "Choose which categories appear in the cart upsell section.",
         upsell_on: "Show in add-ons",
@@ -177,13 +193,17 @@
         err_name: "Введите название", err_cat_req: "Выберите категорию", err_price: "Цена должна быть > 0",
         soum: "сум", cnt_suffix: "шт",
         stock_in: "✅ В наличии", stock_out: "❌ Нет в наличии",
+        btn_hide: "🙈", btn_hide_hint: "Скрыть из меню (не удалить)",
+        btn_activate: "✅ Активировать",
+        hidden_label: "СКРЫТ",
+        confirm_hide: "Скрыть \"{n}\" из меню? Можно восстановить из панели.",
         upsell_title: "➕ Доп. к заказу",
         upsell_hint: "Выберите категории, которые показываются в разделе «добавить к заказу» в корзине.",
         upsell_on: "Показывать в допах",
       },
     };
   </script>
-  <script src="/static/i18n.js?v=20260517b"></script>
-  <script src="/static/admin-products.js?v=20260517b"></script>
+  <script src="/static/i18n.js?v=20260517c"></script>
+  <script src="/static/admin-products.js?v=20260517c"></script>
 </body>
 </html>

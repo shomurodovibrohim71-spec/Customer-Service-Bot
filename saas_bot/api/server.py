@@ -213,7 +213,8 @@ async def api_admin_products_list(
     t = get_tenant(tenant)
     _check_admin(t, init_data, uid)
     db = get_db(tenant)
-    products = await db.list_products()
+    # Include inactive (is_active=0) products so admin can reactivate them.
+    products = await db.list_products(active_only=False)
     categories = await db.list_categories()
     return {
         "products": [{
@@ -223,9 +224,25 @@ async def api_admin_products_list(
             "price_value": int(p.get("price_value") or 0),
             "description": p.get("description") or "",
             "image_url": p.get("image_url") or "",
+            "in_stock": int(p.get("in_stock", 1)),
+            "is_active": int(p.get("is_active", 1)),
         } for p in products],
         "categories": categories,
     }
+
+
+@app.post("/api/admin/products/{product_id}/toggle-active")
+async def api_admin_products_toggle_active(
+    product_id: int, payload: AdminQuery,
+) -> dict[str, Any]:
+    """Toggle product is_active (visible in menu ↔ hidden from menu but not deleted)."""
+    t = get_tenant(payload.tenant_id)
+    _check_admin(t, payload.init_data, payload.fallback_uid)
+    db = get_db(payload.tenant_id)
+    new_val = await db.toggle_product_active(product_id)
+    if new_val is None:
+        raise HTTPException(status_code=404, detail="product not found")
+    return {"ok": True, "is_active": new_val}
 
 
 @app.post("/api/admin/products")
