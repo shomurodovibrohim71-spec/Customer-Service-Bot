@@ -32,6 +32,13 @@
     box.classList.remove("hidden");
   }
 
+  if (typeof Chart === "undefined") {
+    $("loading").classList.add("hidden");
+    $("errBox").textContent = "⚠️ Chart.js yuklanmadi. Internet aloqasini tekshiring.";
+    $("errBox").classList.remove("hidden");
+    return;
+  }
+
   async function load() {
     try {
       const qs = new URLSearchParams({
@@ -40,7 +47,12 @@
       const r = await fetch(`/api/admin/stats?${qs}`);
       const data = await r.json();
       if (!r.ok) throw new Error(data.detail || T("loading"));
-      render(data);
+      try {
+        render(data);
+      } catch (re) {
+        console.error("render error:", re);
+        showErr("Render xatosi: " + re.message);
+      }
     } catch (e) {
       showErr(e.message);
     }
