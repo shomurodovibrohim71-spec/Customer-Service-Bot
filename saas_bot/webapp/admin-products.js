@@ -109,34 +109,77 @@
   function card(p) {
     const c = document.createElement("div");
     c.className = "admin-prod-card" + (p.in_stock === 0 ? " out-of-stock" : "");
-    const img = p.image_url
-      ? `<div class="admin-prod-img" style="background-image:url('${escapeHtml(p.image_url)}')"></div>`
-      : `<div class="admin-prod-img admin-prod-img-empty">🍔</div>`;
-    const stockLabel = p.in_stock === 0 ? T("stock_out") : T("stock_in");
-    const stockClass = p.in_stock === 0 ? "stock-badge out" : "stock-badge in";
-    c.innerHTML = `
-      ${img}
-      <div class="admin-prod-info">
-        <div class="admin-prod-name">${escapeHtml(p.name)}</div>
-        <div class="admin-prod-price">${fmt(p.price_value)}</div>
-        <button class="stock-toggle-btn ${stockClass}" data-id="${p.id}">${stockLabel}</button>
-      </div>
-    `;
-    c.querySelector(".stock-toggle-btn").onclick = async (e) => {
+
+    // Image
+    const imgEl = document.createElement("div");
+    imgEl.className = p.image_url ? "prod-img" : "admin-prod-img-empty";
+    if (p.image_url) {
+      const im = document.createElement("img");
+      im.className = "prod-img"; im.src = p.image_url; im.alt = p.name;
+      im.onerror = () => { imgEl.style.backgroundImage = "none"; imgEl.textContent = "🍔"; };
+      c.appendChild(im);
+    } else {
+      imgEl.textContent = "🍔";
+      c.appendChild(imgEl);
+    }
+
+    // Body
+    const body = document.createElement("div");
+    body.className = "prod-body";
+    body.innerHTML = `
+      <div class="prod-name">${escapeHtml(p.name)}</div>
+      <div class="prod-price">${fmt(p.price_value)} so'm</div>`;
+    c.appendChild(body);
+
+    // Action row
+    const actions = document.createElement("div");
+    actions.className = "prod-actions";
+
+    // Stock toggle
+    const stockBtn = document.createElement("button");
+    stockBtn.className = "prod-btn " + (p.in_stock === 0 ? "prod-btn-stock-out" : "prod-btn-stock-in");
+    stockBtn.textContent = p.in_stock === 0 ? T("stock_out") : T("stock_in");
+    stockBtn.onclick = async (e) => {
       e.stopPropagation();
-      const btn = e.currentTarget;
-      btn.disabled = true;
+      stockBtn.disabled = true;
       try {
         const res = await api("POST", `/api/admin/products/${p.id}/toggle-stock`);
         p.in_stock = res.in_stock ? 1 : 0;
         c.className = "admin-prod-card" + (p.in_stock === 0 ? " out-of-stock" : "");
-        btn.textContent = p.in_stock === 0 ? T("stock_out") : T("stock_in");
-        btn.className = "stock-toggle-btn " + (p.in_stock === 0 ? "stock-badge out" : "stock-badge in");
+        stockBtn.textContent = p.in_stock === 0 ? T("stock_out") : T("stock_in");
+        stockBtn.className = "prod-btn " + (p.in_stock === 0 ? "prod-btn-stock-out" : "prod-btn-stock-in");
         if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred("light");
       } catch (err) { alert("⚠️ " + err.message); }
-      finally { btn.disabled = false; }
+      finally { stockBtn.disabled = false; }
     };
-    c.onclick = (e) => { if (!e.target.closest(".stock-toggle-btn")) openEdit(p); };
+
+    // Edit button
+    const editBtn = document.createElement("button");
+    editBtn.className = "prod-btn prod-btn-edit";
+    editBtn.textContent = "✏️ " + T("edit_title").replace("✏ ", "");
+    editBtn.onclick = (e) => { e.stopPropagation(); openEdit(p); };
+
+    // Delete button
+    const delBtn = document.createElement("button");
+    delBtn.className = "prod-btn prod-btn-del";
+    delBtn.textContent = "🗑";
+    delBtn.title = T("del_btn");
+    delBtn.onclick = async (e) => {
+      e.stopPropagation();
+      if (!confirm(tfmt("confirm_del_prod", { n: p.name }))) return;
+      delBtn.disabled = true;
+      try {
+        await api("DELETE", `/api/admin/products/${p.id}`, { id: p.id });
+        if (tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
+        await load();
+      } catch (err) { alert("⚠️ " + err.message); }
+      finally { delBtn.disabled = false; }
+    };
+
+    actions.appendChild(stockBtn);
+    actions.appendChild(editBtn);
+    actions.appendChild(delBtn);
+    c.appendChild(actions);
     return c;
   }
 
