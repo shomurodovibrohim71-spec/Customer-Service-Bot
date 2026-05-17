@@ -8,67 +8,64 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <link rel="stylesheet" href="/static/styles.css">
   <style>
-    /* ── Admin Orders — premium redesign ─────────────────────────── */
-    body { background: var(--bg); }
+    /* ── Admin Orders — UX improved ──────────────────────────────── */
+    body { background: var(--bg); font-size: 15px; }
 
     .ao-topbar {
       position: sticky; top: 0; z-index: 10;
       background: rgba(15,17,21,0.92);
-      backdrop-filter: blur(18px);
-      -webkit-backdrop-filter: blur(18px);
+      backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
       border-bottom: 1px solid var(--line);
-      padding: 12px 16px 0;
+      padding: 14px 16px 0;
     }
     .ao-topbar-row {
       display: flex; align-items: center; justify-content: space-between;
-      margin-bottom: 10px;
+      margin-bottom: 12px;
     }
-    .ao-title { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
+    .ao-title { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; }
     .ao-count-pill {
       background: var(--brand-grad);
-      color: #fff; font-size: 12px; font-weight: 700;
-      padding: 3px 10px; border-radius: var(--r-pill);
+      color: #fff; font-size: 13px; font-weight: 700;
+      padding: 4px 12px; border-radius: var(--r-pill);
     }
 
     /* Tabs */
     .ao-tabs {
       display: flex; gap: 6px; overflow-x: auto;
-      scrollbar-width: none; padding-bottom: 12px;
+      scrollbar-width: none; padding-bottom: 14px;
     }
     .ao-tabs::-webkit-scrollbar { display: none; }
     .ao-tab {
-      flex-shrink: 0; display: flex; align-items: center; gap: 6px;
-      padding: 8px 14px; border-radius: var(--r-pill);
+      flex-shrink: 0; display: flex; align-items: center; gap: 7px;
+      padding: 10px 16px; border-radius: var(--r-pill);
       background: var(--surface); border: 1px solid var(--line);
-      font-size: 13px; font-weight: 600; color: var(--text-muted);
+      font-size: 14px; font-weight: 600; color: var(--text-muted);
       cursor: pointer; white-space: nowrap;
       transition: all .2s var(--ease);
     }
     .ao-tab .ao-cnt {
       background: var(--bg-soft);
-      padding: 1px 7px; border-radius: var(--r-pill);
-      font-size: 11px; font-weight: 800; color: var(--text);
+      padding: 2px 8px; border-radius: var(--r-pill);
+      font-size: 13px; font-weight: 800; color: var(--text);
       transition: all .2s;
     }
     .ao-tab.active { background: var(--brand-grad); border-color: transparent; color: #fff; }
     .ao-tab.active .ao-cnt { background: rgba(255,255,255,0.22); color: #fff; }
 
     /* Search */
-    .ao-search-wrap { padding: 12px 14px 0; }
+    .ao-search-wrap { padding: 12px 14px 4px; position: relative; }
     .ao-search {
-      width: 100%; padding: 12px 16px 12px 42px;
+      width: 100%; padding: 13px 16px 13px 44px;
       background: var(--surface); border: 1px solid var(--line);
       border-radius: var(--r-lg); color: var(--text);
-      font-size: 14px; position: relative;
-      transition: border-color .2s;
+      font-size: 15px; transition: border-color .2s;
       box-sizing: border-box;
     }
     .ao-search:focus { outline: none; border-color: var(--brand); }
-    .ao-search-wrap { position: relative; }
     .ao-search-icon {
       position: absolute; left: 28px; top: 50%;
       transform: translateY(-50%);
-      font-size: 16px; pointer-events: none;
+      font-size: 17px; pointer-events: none;
     }
 
     /* List */
@@ -103,11 +100,11 @@
       justify-content: space-between; gap: 8px;
     }
     .ao-card-id-wrap { display: flex; align-items: center; gap: 8px; }
-    .ao-card-id { font-size: 16px; font-weight: 800; letter-spacing: -0.01em; }
-    .ao-card-date { font-size: 11px; color: var(--text-muted); font-weight: 500; }
+    .ao-card-id { font-size: 18px; font-weight: 800; letter-spacing: -0.01em; }
+    .ao-card-date { font-size: 13px; color: var(--text-muted); font-weight: 500; }
 
     .ao-status {
-      font-size: 11px; font-weight: 700; padding: 3px 10px;
+      font-size: 13px; font-weight: 700; padding: 5px 12px;
       border-radius: var(--r-pill); white-space: nowrap; flex-shrink: 0;
     }
     .st-pending    { background: rgba(255,176,32,0.18); color: var(--warning); }
@@ -120,16 +117,16 @@
     .ao-card-user {
       display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
     }
-    .ao-card-name { font-size: 14px; font-weight: 700; }
+    .ao-card-name { font-size: 16px; font-weight: 700; }
     .ao-card-phone {
-      font-size: 13px; color: var(--accent);
+      font-size: 14px; color: var(--accent);
       text-decoration: none; font-weight: 600;
     }
-    .ao-card-uname { font-size: 12px; color: var(--text-muted); }
+    .ao-card-uname { font-size: 13px; color: var(--text-muted); }
 
     .ao-card-addr {
-      font-size: 12px; color: var(--text-muted); line-height: 1.4;
-      display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical;
+      font-size: 13px; color: var(--text-muted); line-height: 1.5;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
       overflow: hidden;
     }
 
@@ -137,7 +134,7 @@
     .ao-chip {
       display: flex; align-items: center; gap: 4px;
       background: var(--bg-soft); border-radius: var(--r-pill);
-      padding: 3px 10px; font-size: 12px; font-weight: 600;
+      padding: 5px 12px; font-size: 13px; font-weight: 600;
     }
     .ao-chip-qty { color: var(--brand); font-weight: 800; }
     .ao-chip-more { color: var(--text-muted); background: transparent; }
@@ -145,18 +142,18 @@
     .ao-card-foot {
       display: flex; align-items: center;
       justify-content: space-between; gap: 10px;
-      padding-top: 8px; border-top: 1px solid var(--line);
+      padding-top: 10px; border-top: 1px solid var(--line);
     }
-    .ao-card-total { font-size: 18px; font-weight: 800; color: var(--brand); }
+    .ao-card-total { font-size: 20px; font-weight: 800; color: var(--brand); }
     .ao-pay-badge {
-      font-size: 11px; font-weight: 700;
-      padding: 3px 9px; border-radius: var(--r-pill);
+      font-size: 13px; font-weight: 700;
+      padding: 4px 10px; border-radius: var(--r-pill);
       background: var(--bg-soft); color: var(--text-muted);
     }
     .ao-open-btn {
       background: var(--brand-grad); border: none;
-      color: #fff; font-size: 12px; font-weight: 700;
-      padding: 8px 14px; border-radius: var(--r-pill);
+      color: #fff; font-size: 13px; font-weight: 700;
+      padding: 10px 16px; border-radius: var(--r-pill);
       cursor: pointer; flex-shrink: 0;
       transition: filter .15s;
     }
@@ -165,11 +162,11 @@
     /* Quick action buttons on card */
     .ao-quick-actions {
       display: grid; grid-template-columns: 1fr 1fr;
-      gap: 6px; padding-top: 4px;
+      gap: 7px; padding-top: 6px;
     }
     .ao-qa-btn {
-      padding: 9px 0; border-radius: var(--r-md);
-      font-size: 12px; font-weight: 700;
+      padding: 12px 0; border-radius: var(--r-md);
+      font-size: 14px; font-weight: 700;
       border: none; cursor: pointer;
       transition: filter .15s, transform .1s;
     }
@@ -181,50 +178,51 @@
     .ao-qa-cancel    { background: rgba(255,93,93,0.14); color: var(--danger); }
 
     /* Detail screen */
-    .ao-detail-content { padding: 14px 14px 100px; display: flex; flex-direction: column; gap: 12px; }
+    .ao-detail-content { padding: 14px 14px 100px; display: flex; flex-direction: column; gap: 14px; }
 
     .ao-detail-section {
       background: var(--surface); border: 1px solid var(--line);
       border-radius: var(--r-lg); overflow: hidden;
     }
     .ao-detail-section-head {
-      padding: 12px 14px; border-bottom: 1px solid var(--line);
-      font-size: 12px; font-weight: 700; color: var(--text-muted);
+      padding: 13px 16px; border-bottom: 1px solid var(--line);
+      font-size: 13px; font-weight: 700; color: var(--text-muted);
       text-transform: uppercase; letter-spacing: 0.06em;
     }
     .ao-detail-row {
-      display: flex; align-items: flex-start; gap: 10px;
-      padding: 10px 14px; font-size: 14px;
+      display: flex; align-items: flex-start; gap: 12px;
+      padding: 13px 16px; font-size: 15px;
       border-bottom: 1px solid var(--line);
     }
     .ao-detail-row:last-child { border-bottom: none; }
-    .ao-detail-key { color: var(--text-muted); font-size: 13px; flex: 0 0 90px; }
+    .ao-detail-key { color: var(--text-muted); font-size: 14px; flex: 0 0 100px; }
     .ao-detail-val { flex: 1; font-weight: 600; word-break: break-word; }
 
     .ao-items-section { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); overflow: hidden; }
     .ao-item-row {
-      display: flex; align-items: center; gap: 10px;
-      padding: 10px 14px; border-bottom: 1px solid var(--line);
-      font-size: 14px;
+      display: flex; align-items: center; gap: 12px;
+      padding: 13px 16px; border-bottom: 1px solid var(--line);
+      font-size: 15px;
     }
     .ao-item-row:last-child { border-bottom: none; }
     .ao-item-name { flex: 1; font-weight: 600; }
-    .ao-item-qty { color: var(--text-muted); font-weight: 700; font-size: 12px; }
-    .ao-item-price { color: var(--brand); font-weight: 800; }
+    .ao-item-qty { color: var(--text-muted); font-weight: 700; font-size: 14px; }
+    .ao-item-price { color: var(--brand); font-weight: 800; font-size: 15px; }
 
     .ao-total-row {
       display: flex; justify-content: space-between; align-items: center;
-      padding: 12px 14px; font-size: 16px;
+      padding: 14px 16px; font-size: 17px;
       border-top: 1px solid var(--line);
       background: var(--bg-soft);
     }
-    .ao-total-row strong { font-size: 20px; color: var(--brand); font-weight: 800; }
+    .ao-total-row strong { font-size: 22px; color: var(--brand); font-weight: 800; }
 
-    .ao-detail-actions { display: flex; flex-direction: column; gap: 8px; }
-    .ao-detail-actions .primary-btn, .ao-detail-actions .ghost-btn { margin: 0; }
+    .ao-detail-actions { display: flex; flex-direction: column; gap: 10px; }
+    .ao-detail-actions .primary-btn,
+    .ao-detail-actions .ghost-btn { margin: 0; font-size: 15px; padding: 14px; }
 
-    .ao-empty { text-align: center; padding: 64px 20px; color: var(--text-muted); font-size: 15px; }
-    .ao-empty-icon { font-size: 48px; margin-bottom: 12px; }
+    .ao-empty { text-align: center; padding: 64px 20px; color: var(--text-muted); font-size: 16px; }
+    .ao-empty-icon { font-size: 52px; margin-bottom: 14px; }
 
     /* Fee modal */
     .fee-modal-bg {
@@ -250,7 +248,7 @@
       box-sizing: border-box;
     }
     .fee-input:focus { outline: none; }
-    .fee-modal-hint { font-size: 12px; color: var(--text-muted); text-align: center; min-height: 16px; }
+    .fee-modal-hint { font-size: 14px; color: var(--text-muted); text-align: center; min-height: 18px; }
     .fee-modal-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   </style>
 </head>
@@ -404,7 +402,7 @@
       },
     };
   </script>
-  <script src="/static/i18n.js"></script>
-  <script src="/static/admin-orders.js"></script>
+  <script src="/static/i18n.js?v=20260517d"></script>
+  <script src="/static/admin-orders.js?v=20260517d"></script>
 </body>
 </html>
