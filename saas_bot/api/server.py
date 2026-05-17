@@ -1388,14 +1388,17 @@ async def api_admin_stats(
     t = get_tenant(tenant)
     _check_admin(t, init_data, uid)
     db = get_db(tenant)
-    summary = await db.revenue_summary()
-    daily   = await db.daily_revenue(days=days)
-    top     = await db.top_products(limit=5)
-    bottom  = await db.bottom_products(limit=5)
-    hours   = await db.peak_hours()
-    by_status = await db.count_orders_by_status()
+    summary     = await db.revenue_summary()
+    daily       = await db.daily_revenue(days=days)
+    top         = await db.top_products(limit=5)
+    hours       = await db.peak_hours()
+    by_status   = await db.count_orders_by_status()
     users_total = await db.count_users()
     users_today = await db.count_new_users_today()
+    try:
+        bottom = await db.bottom_products(limit=5)
+    except Exception:
+        bottom = []
     return {
         **summary,
         "daily": daily, "top_products": top, "bottom_products": bottom,
