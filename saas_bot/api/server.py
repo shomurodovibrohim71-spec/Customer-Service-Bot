@@ -1391,14 +1391,15 @@ async def api_admin_stats(
     summary = await db.revenue_summary()
     daily   = await db.daily_revenue(days=days)
     top     = await db.top_products(limit=5)
+    bottom  = await db.bottom_products(limit=5)
     hours   = await db.peak_hours()
     by_status = await db.count_orders_by_status()
     users_total = await db.count_users()
     users_today = await db.count_new_users_today()
     return {
         **summary,
-        "daily": daily, "top_products": top, "peak_hours": hours,
-        "by_status": by_status,
+        "daily": daily, "top_products": top, "bottom_products": bottom,
+        "peak_hours": hours, "by_status": by_status,
         "users_total": users_total, "users_today": users_today,
         "tenant_name": t.name,
     }

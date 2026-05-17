@@ -663,14 +663,6 @@ textarea { width: 100%; resize: vertical; min-height: 80px; }
   position: relative;
 }
 .admin-prod-card:active { transform: scale(0.97); border-color: var(--brand); }
-.admin-prod-card::after {
-  content: "✏"; position: absolute; top: 8px; right: 8px;
-  width: 28px; height: 28px; border-radius: 50%;
-  background: rgba(0,0,0,0.55); backdrop-filter: blur(4px);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 12px; opacity: 0; transition: opacity var(--dur);
-}
-.admin-prod-card:hover::after { opacity: 1; }
 .admin-prod-img {
   width: 100%; aspect-ratio: 1.2 / 1;
   background: #0b0d11 center/cover no-repeat;

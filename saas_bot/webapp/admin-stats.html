@@ -7,12 +7,27 @@
   <title>Stats</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <link rel="stylesheet" href="/static/styles.css">
+  <link rel="stylesheet" href="/static/styles.css?v=20260517g">
   <style>
     .chart-wrap { position: relative; width: 200px; height: 200px; margin: 0 auto 10px; }
     .chart-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; justify-content: center; padding: 0 16px 4px; }
     .chart-legend-item { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--sub); }
     .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+    /* Peak hours chart */
+    .peak-summary {
+      margin-top: 10px; padding: 10px 14px; border-radius: 12px;
+      background: rgba(255,122,24,0.1); border: 1px solid rgba(255,122,24,0.2);
+      font-size: 13px; color: var(--text); text-align: center; line-height: 1.5;
+    }
+    .peak-summary strong { color: #ff7a18; }
+
+    /* Bottom (least sold) hint */
+    .bottom-hint {
+      margin-top: 8px; font-size: 12px; color: var(--text-muted);
+      text-align: center; line-height: 1.5;
+    }
+    .bottom-hint strong { color: #f87171; }
   </style>
 </head>
 <body>
@@ -50,7 +65,7 @@
 
     <section id="chartSection" class="dash-section hidden">
       <h3 data-t="s_chart">📈 So'nggi 7 kun daromadi</h3>
-      <div id="barChart" class="bar-chart"></div>
+      <div style="position:relative;width:100%;height:180px"><canvas id="barChart"></canvas></div>
     </section>
 
     <section id="topSection" class="dash-section hidden">
@@ -60,8 +75,14 @@
 
     <section id="hoursSection" class="dash-section hidden">
       <h3 data-t="s_hours">🕐 Buyurtmalar pikida (24 soat)</h3>
-      <div id="hoursRow" class="hours-row"></div>
-      <div style="height:18px"></div>
+      <div style="position:relative;width:100%;height:160px"><canvas id="peakChart"></canvas></div>
+      <div id="peakSummary"></div>
+    </section>
+
+    <section id="bottomSection" class="dash-section hidden">
+      <h3 data-t="s_bottom">📉 Kam sotilayotgan mahsulotlar</h3>
+      <div style="position:relative;width:100%;height:230px"><canvas id="bottomChart"></canvas></div>
+      <div id="bottomHint" class="bottom-hint"></div>
     </section>
 
     <section id="statusSection" class="dash-section hidden">
@@ -78,6 +99,8 @@
         m_revenue: "📅 Oylik daromad", m_today: "🟢 Bugun", m_week: "📅 Hafta", m_users: "👥 Mijozlar",
         s_chart: "📈 So'nggi 7 kun daromadi", s_top: "🏆 Eng ko'p sotilgan mahsulotlar",
         s_hours: "🕐 Buyurtmalar pikida (24 soat)", s_status: "📋 Status bo'yicha",
+        s_bottom: "📉 Kam sotilayotgan mahsulotlar", bottom_never: "Hali sotilmagan",
+        peak_label: "🔥 Eng band vaqt", peak_orders: "ta buyurtma", no_peak: "Ma'lumot yo'q",
         orders_count: "{n} ta buyurtma", users_today: "bugun: {n}",
         no_orders_yet: "Hozircha buyurtmalar yo'q", no_products_yet: "Hozircha sotilgan mahsulotlar yo'q",
         no_orders: "Buyurtmalar yo'q", qty_suffix: "ta",
@@ -91,6 +114,8 @@
         m_revenue: "📅 Monthly revenue", m_today: "🟢 Today", m_week: "📅 Week", m_users: "👥 Customers",
         s_chart: "📈 Revenue, last 7 days", s_top: "🏆 Top-selling products",
         s_hours: "🕐 Peak hours (24h)", s_status: "📋 By status",
+        s_bottom: "📉 Least-sold products", bottom_never: "Never sold",
+        peak_label: "🔥 Busiest hour", peak_orders: "orders", no_peak: "No data",
         orders_count: "{n} orders", users_today: "today: {n}",
         no_orders_yet: "No orders yet", no_products_yet: "No products sold yet",
         no_orders: "No orders", qty_suffix: "pcs",
@@ -104,6 +129,8 @@
         m_revenue: "📅 Доход за месяц", m_today: "🟢 Сегодня", m_week: "📅 Неделя", m_users: "👥 Клиенты",
         s_chart: "📈 Доход за 7 дней", s_top: "🏆 Самые продаваемые товары",
         s_hours: "🕐 Пиковые часы (24 ч)", s_status: "📋 По статусам",
+        s_bottom: "📉 Мало продаваемые товары", bottom_never: "Не продавался",
+        peak_label: "🔥 Пиковый час", peak_orders: "заказов", no_peak: "Нет данных",
         orders_count: "{n} заказов", users_today: "сегодня: {n}",
         no_orders_yet: "Заказов пока нет", no_products_yet: "Продаж пока нет",
         no_orders: "Заказов нет", qty_suffix: "шт",
@@ -114,7 +141,7 @@
       },
     };
   </script>
-  <script src="/static/i18n.js"></script>
-  <script src="/static/admin-stats.js"></script>
+  <script src="/static/i18n.js?v=20260517g"></script>
+  <script src="/static/admin-stats.js?v=20260517g"></script>
 </body>
 </html>

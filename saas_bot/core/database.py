@@ -1101,7 +1101,8 @@ class Database:
         return out
 
     async def daily_revenue(self, days: int = 7) -> list[dict[str, Any]]:
-        """Per-day revenue/order count for the last N days, oldest-first."""
+        """Per-day revenue/order count for the last N days, oldest-first. All days included (0 if no orders)."""
+        start = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days - 1)
         async with self.conn.execute(
             """SELECT substr(created_at, 1, 10) AS day,
                       COALESCE(SUM(amount), 0)   AS revenue,
@@ -1110,11 +1111,17 @@ class Database:
                WHERE tenant_id=? AND status != 'cancelled'
                  AND created_at >= ?
                GROUP BY day ORDER BY day""",
-            (self.tenant_id,
-             (datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)).isoformat(timespec="seconds")),
+            (self.tenant_id, start.replace(hour=0, minute=0, second=0).isoformat(timespec="seconds")),
         ) as cur:
             rows = await cur.fetchall()
-        return [{"day": r["day"], "revenue": int(r["revenue"]), "count": int(r["count"])} for r in rows]
+        db_data = {r["day"]: {"revenue": int(r["revenue"]), "count": int(r["count"])} for r in rows}
+        today = datetime.now(timezone.utc).replace(tzinfo=None).date()
+        result = []
+        for i in range(days - 1, -1, -1):
+            day = (today - timedelta(days=i)).isoformat()
+            result.append({"day": day, "revenue": db_data.get(day, {}).get("revenue", 0),
+                           "count": db_data.get(day, {}).get("count", 0)})
+        return result
 
     async def top_products(self, limit: int = 5) -> list[dict[str, Any]]:
         """Aggregate product counts from items_json across all non-cancelled orders."""
@@ -1137,6 +1144,30 @@ class Database:
                 if name and qty:
                     counts[name] = counts.get(name, 0) + qty
         ranked = sorted(counts.items(), key=lambda kv: kv[1], reverse=True)[:limit]
+        return [{"name": n, "qty": q} for n, q in ranked]
+
+    async def bottom_products(self, limit: int = 5) -> list[dict[str, Any]]:
+        """Return active products with the lowest sales count (including unsold ones)."""
+        import json as _json
+        active = await self.list_products(active_only=True)
+        counts: dict[str, int] = {p["name"]: 0 for p in active}
+        async with self.conn.execute(
+            """SELECT items_json FROM orders
+               WHERE tenant_id=? AND status != 'cancelled' AND items_json IS NOT NULL AND items_json != ''""",
+            (self.tenant_id,),
+        ) as cur:
+            rows = await cur.fetchall()
+        for r in rows:
+            try:
+                items = _json.loads(r["items_json"])
+            except (_json.JSONDecodeError, TypeError, ValueError):
+                continue
+            for it in items or []:
+                name = it.get("name") or ""
+                qty = int(it.get("qty") or 0)
+                if name in counts and qty:
+                    counts[name] += qty
+        ranked = sorted(counts.items(), key=lambda kv: kv[1])[:limit]
         return [{"name": n, "qty": q} for n, q in ranked]
 
     async def peak_hours(self) -> list[int]:
