@@ -11,6 +11,7 @@ WebApp button.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -24,7 +25,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from config.settings import BASE_DIR
+from config.settings import BASE_DIR, get_webapp_url
 from core.database import Database
 from core.initdata import verify_init_data
 from core.tenant import Tenant, load_tenants
@@ -168,6 +169,16 @@ async def webapp_admin_users() -> FileResponse:
 @app.get("/webapp/admin/couriers")
 async def webapp_admin_couriers() -> FileResponse:
     return _webapp_file("admin-couriers.html")
+
+
+@app.get("/webapp/track")
+async def webapp_track() -> FileResponse:
+    return _webapp_file("track.html")
+
+
+@app.get("/webapp/my-orders")
+async def webapp_my_orders() -> FileResponse:
+    return _webapp_file("my-orders.html")
 
 
 def _check_admin(tenant: Tenant, init_data: str, fallback_uid: int | None) -> int:
@@ -671,6 +682,9 @@ async def api_orders_history(
             "address": o.get("address") or "",
             "branch": o.get("branch") or "",
             "payment_method": o.get("payment_method") or "cash",
+            "courier_lat": o.get("courier_lat"),
+            "courier_lon": o.get("courier_lon"),
+            "eta_minutes": o.get("eta_minutes"),
             "items": items,
         })
     return {"orders": orders}
@@ -1315,9 +1329,9 @@ async def api_admin_orders_status(payload: AdminOrderStatusIn) -> dict[str, Any]
                 "ru": f"👨‍🍳 Ваш заказ #{oid} готовится! Немного подождите 🙏",
             },
             "on_the_way": {
-                "uz": f"🚗 Buyurtmangiz #{oid} yo'lda! Kuryer sizga yetib bormoqda 📍",
-                "en": f"🚗 Your order #{oid} is on the way! The courier is heading to you 📍",
-                "ru": f"🚗 Ваш заказ #{oid} в пути! Курьер уже едет к вам 📍",
+                "uz": f"🚗 Buyurtmangiz #{oid} yo'lda! Kuryer sizga yetib bormoqda 📍\n\n👇 Kuryer qayerdaligini kuzating:",
+                "en": f"🚗 Your order #{oid} is on the way! The courier is heading to you 📍\n\n👇 Track your courier:",
+                "ru": f"🚗 Ваш заказ #{oid} в пути! Курьер уже едет к вам 📍\n\n👇 Отследите курьера:",
             },
             "delivered": {
                 "uz": f"📦 Buyurtmangiz #{oid} yetkazildi! Yaxshi ovqatlanishingizni tilaymiz 🍔",
@@ -1333,14 +1347,69 @@ async def api_admin_orders_status(payload: AdminOrderStatusIn) -> dict[str, Any]
         msg = notify_msgs.get(payload.status, {}).get(cust_lang)
         if msg:
             try:
+                send_payload: dict[str, Any] = {
+                    "chat_id": int(order["user_id"]),
+                    "text": msg,
+                }
+                if payload.status == "on_the_way":
+                    track_url = get_webapp_url()
+                    if track_url:
+                        url = f"{track_url}/webapp/track?tenant={t.id}&order_id={oid}&uid={order['user_id']}"
+                        btn_label = {"uz": "📍 Kuryer qayerda?", "en": "📍 Track courier", "ru": "📍 Где курьер?"}.get(cust_lang, "📍 Kuryer qayerda?")
+                        send_payload["reply_markup"] = json.dumps({
+                            "inline_keyboard": [[{"text": btn_label, "url": url}]]
+                        })
                 async with httpx.AsyncClient(timeout=10.0) as client:
                     await client.post(
                         f"https://api.telegram.org/bot{t.bot_token}/sendMessage",
-                        json={"chat_id": int(order["user_id"]), "text": msg},
+                        json=send_payload,
                     )
             except httpx.HTTPError as exc:
                 logger.warning("[%s] order status notify failed: %s", t.id, exc)
     return {"ok": True}
+
+
+# ------------------------------------------------------------ Courier location
+
+class CourierLocationIn(BaseModel):
+    tenant_id: str
+    order_id: int
+    lat: float
+    lon: float
+    init_data: str = ""
+    fallback_uid: int | None = None
+
+
+@app.post("/api/admin/orders/courier-location")
+async def api_set_courier_location(payload: CourierLocationIn) -> dict[str, Any]:
+    t = get_tenant(payload.tenant_id)
+    _check_admin(t, payload.init_data, payload.fallback_uid)
+    db = get_db(payload.tenant_id)
+    ok = await db.set_courier_location(payload.order_id, payload.lat, payload.lon)
+    if not ok:
+        raise HTTPException(status_code=404, detail="order not found")
+    return {"ok": True}
+
+
+@app.get("/api/track")
+async def api_track(tenant: str, order_id: int, uid: int | None = None) -> dict[str, Any]:
+    """Public tracking endpoint. Returns order status + courier location."""
+    db = get_db(tenant)
+    row = await db.get_order_tracking(order_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="order not found")
+    if uid is not None and int(row["user_id"]) != uid:
+        raise HTTPException(status_code=403, detail="forbidden")
+    return {
+        "order_id": order_id,
+        "status": row["status"],
+        "courier_name": row["courier_name"] or "",
+        "courier_phone": row["courier_phone"] or "",
+        "eta_minutes": row["eta_minutes"],
+        "courier_lat": row["courier_lat"],
+        "courier_lon": row["courier_lon"],
+        "courier_updated_at": row["courier_updated_at"] or "",
+    }
 
 
 # ============================================================ Admin users
@@ -1595,6 +1664,40 @@ async def api_order(payload: OrderIn) -> dict[str, Any]:
         await db.increment_promo_use(applied_code)
     if total:
         await db.add_points(user_id, total * 0.05)
+
+    # ── Auto-print 3 receipts (kitchen / courier / admin) ──────────────────
+    try:
+        from utils.printer import print_order_receipts
+        import json as _json
+        _items_list = []
+        try:
+            _items_list = _json.loads(payload.items_json) if hasattr(payload, "items_json") else items_for_json
+        except Exception:
+            _items_list = items_for_json
+        _print_order = {
+            "id":              order_id,
+            "items":           _items_list,
+            "full_name":       full_name,
+            "phone":           phone,
+            "address":         payload.address,
+            "delivery_type":   payload.delivery_type,
+            "branch":          branch_name,
+            "amount":          total,
+            "payment_method":  payment_method,
+            "note":            payload.note,
+            "courier_note":    payload.courier_note,
+            "floor":           payload.floor,
+            "entrance":        payload.entrance,
+            "apartment":       payload.apartment,
+            "intercom":        payload.intercom,
+            "discount":        discount,
+            "promo_code":      applied_code,
+            "preferred_time":  payload.preferred_time,
+            "service":         service_summary,
+        }
+        asyncio.create_task(print_order_receipts(_print_order, tenant_name=getattr(tenant, "name", "")))
+    except Exception as _pe:
+        logger.warning("Receipt print skipped: %s", _pe)
 
     # Build Click/Payme URLs (always present for 'card', empty for 'cash').
     settings = await db.all_settings()

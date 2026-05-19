@@ -215,6 +215,10 @@ _MIGRATIONS = [
     ("orders",   "delivery_fee", "INTEGER DEFAULT 0"),
     # Assigned courier FK (references couriers.id, nullable).
     ("orders",   "courier_id",  "INTEGER"),
+    # Courier real-time location for tracking webapp.
+    ("orders",   "courier_lat",        "REAL"),
+    ("orders",   "courier_lon",        "REAL"),
+    ("orders",   "courier_updated_at", "TEXT"),
 ]
 
 
@@ -706,9 +710,9 @@ class Database:
         return [dict(r) for r in rows]
 
     async def delete_product(self, product_id: int) -> bool:
-        """Soft-deactivate (is_active=0). Use toggle_product_active to reverse."""
+        """Permanently delete a product from the database."""
         cur = await self.conn.execute(
-            "UPDATE products SET is_active=0 WHERE id=? AND tenant_id=?",
+            "DELETE FROM products WHERE id=? AND tenant_id=?",
             (product_id, self.tenant_id),
         )
         await self.conn.commit()
@@ -865,6 +869,34 @@ class Database:
         )
         await self.conn.commit()
         return cur.rowcount > 0
+
+    async def update_address(self, addr_id: int, user_id: int, new_text: str) -> bool:
+        cur = await self.conn.execute(
+            "UPDATE addresses SET text=? WHERE id=? AND tenant_id=? AND user_id=? AND is_active=1",
+            (new_text, addr_id, self.tenant_id, user_id),
+        )
+        await self.conn.commit()
+        return cur.rowcount > 0
+
+    # --------------------------------------------------------------- courier tracking
+
+    async def set_courier_location(self, order_id: int, lat: float, lon: float) -> bool:
+        cur = await self.conn.execute(
+            "UPDATE orders SET courier_lat=?, courier_lon=?, courier_updated_at=? WHERE id=? AND tenant_id=?",
+            (lat, lon, _now(), order_id, self.tenant_id),
+        )
+        await self.conn.commit()
+        return cur.rowcount > 0
+
+    async def get_order_tracking(self, order_id: int) -> dict[str, Any] | None:
+        async with self.conn.execute(
+            """SELECT id, status, courier_name, courier_phone, eta_minutes,
+                      courier_lat, courier_lon, courier_updated_at, user_id
+               FROM orders WHERE id=? AND tenant_id=?""",
+            (order_id, self.tenant_id),
+        ) as cur:
+            row = await cur.fetchone()
+        return dict(row) if row else None
 
     # ---------------------------------------------------------------- feedback
 

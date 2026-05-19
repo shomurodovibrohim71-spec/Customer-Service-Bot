@@ -43,6 +43,21 @@ def get_webapp_url() -> str:
             pass
     return os.getenv("WEBAPP_URL", "").rstrip("/")
 
+PRINTER_NAME: str = os.getenv("PRINTER_NAME", "")
+
+
+def get_printer_name() -> str:
+    """Read PRINTER_NAME live from .env each call."""
+    if _ENV_PATH.exists():
+        try:
+            for line in _ENV_PATH.read_text(encoding="utf-8").splitlines():
+                if line.startswith("PRINTER_NAME="):
+                    return line.split("=", 1)[1].strip()
+        except OSError:
+            pass
+    return os.getenv("PRINTER_NAME", "")
+
+
 MAX_HISTORY_MESSAGES: int = int(os.getenv("MAX_HISTORY_MESSAGES", "10"))
 AI_MAX_TOKENS: int = int(os.getenv("AI_MAX_TOKENS", "1024"))
 AI_TEMPERATURE: float = float(os.getenv("AI_TEMPERATURE", "0.7"))

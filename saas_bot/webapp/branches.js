@@ -99,15 +99,6 @@
       </div>
     `;
 
-    if (tg && b.lat && b.lon) {
-      const shareBtn = document.createElement("button");
-      shareBtn.className = "ghost-btn";
-      shareBtn.textContent = T("send_loc");
-      shareBtn.onclick = () => {
-        tg.openLink(`https://www.google.com/maps/search/?api=1&query=${b.lat},${b.lon}`);
-      };
-      card.querySelector(".branch-actions").appendChild(shareBtn);
-    }
     return card;
   }
 

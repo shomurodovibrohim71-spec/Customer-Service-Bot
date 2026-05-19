@@ -111,6 +111,7 @@ ADMIN_TEXTS = {
 MENU_LABELS = {
     "uz": {
         "order":      "👨‍🍳 Buyurtma berish",
+        "my_orders":  "📦 Buyurtmalarim",
         "geo":        "📍 Geolokatsiyani yuborish",
         "loyalty_qr": "⭐ Sodiqlik QR",
         "points":     "🎁 Mening ballarim",
@@ -123,6 +124,7 @@ MENU_LABELS = {
     },
     "en": {
         "order":      "👨‍🍳 Order",
+        "my_orders":  "📦 My Orders",
         "geo":        "📍 Send Geolocation",
         "loyalty_qr": "⭐ Loyalty QR",
         "points":     "🎁 My Points",
@@ -135,6 +137,7 @@ MENU_LABELS = {
     },
     "ru": {
         "order":      "👨‍🍳 Заказать",
+        "my_orders":  "📦 Мои заказы",
         "geo":        "📍 Отправить геолокацию",
         "loyalty_qr": "⭐ QR лояльности",
         "points":     "🎁 Мои баллы",

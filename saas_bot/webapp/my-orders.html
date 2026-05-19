@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0f1115">
+  <title>Buyurtmalarim</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="/static/styles.css?v=20260518n">
+  <style>
+    --sub: rgba(245,247,251,0.55);
+    .order-card {
+      background: var(--surface); border: 1px solid var(--line);
+      border-radius: var(--r-lg); padding: 16px 18px; margin-bottom: 12px;
+    }
+    .order-card.active { border-color: rgba(255,122,24,.5); background: rgba(255,122,24,.04); }
+    .order-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .order-id   { font-size: 15px; font-weight: 800; color: var(--text); letter-spacing: -0.01em; }
+    .order-date { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+    .order-status {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 13px; font-weight: 700; padding: 5px 12px;
+      border-radius: 999px; background: rgba(255,255,255,.07);
+      margin-bottom: 8px;
+    }
+    .order-status.pending    { background: rgba(245,158,11,.15); color: #f59e0b; }
+    .order-status.confirmed  { background: rgba(59,130,246,.15); color: #60a5fa; }
+    .order-status.preparing  { background: rgba(139,92,246,.15); color: #a78bfa; }
+    .order-status.on_the_way { background: rgba(255,122,24,.18); color: #ff7a18; }
+    .order-status.delivered  { background: rgba(34,197,94,.15); color: #4ade80; }
+    .order-status.cancelled  { background: rgba(239,68,68,.15); color: #f87171; }
+    .order-items { font-size: 13px; color: var(--text-muted); margin: 8px 0 10px; line-height: 1.6; font-weight: 500; }
+    .order-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; border-top: 1px solid var(--line); padding-top: 10px; }
+    .order-amount { font-size: 17px; font-weight: 800; color: var(--brand); letter-spacing: -0.02em; }
+    .track-btn {
+      padding: 9px 16px; border-radius: var(--r-md); border: none;
+      background: var(--brand-grad); color: #fff; font-size: 13px; font-weight: 700;
+      cursor: pointer; text-decoration: none; display: inline-block;
+      box-shadow: 0 4px 12px rgba(255,122,24,.35);
+    }
+    .track-btn:active { opacity: .85; transform: scale(.97); }
+    .empty-state { text-align: center; padding: 70px 20px; color: var(--text-muted); }
+    .empty-state .emoji { font-size: 52px; margin-bottom: 14px; }
+    .empty-state p { font-size: 15px; font-weight: 500; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="page-title">📦 Buyurtmalarim</div>
+    <div class="page-sub" id="countSub">—</div>
+  </header>
+  <main style="padding: 12px 16px;">
+    <div id="errBox" class="err hidden" style="margin-bottom:12px"></div>
+    <div id="loading" class="loading">Yuklanmoqda…</div>
+    <div id="list" class="hidden"></div>
+  </main>
+
+<script>
+  const tg = window.Telegram?.WebApp;
+  if (tg) { tg.ready(); tg.expand(); }
+
+  const urlP    = new URL(location.href);
+  const tenant  = urlP.searchParams.get("tenant") || "";
+  const uid     = urlP.searchParams.get("uid") || (tg?.initDataUnsafe?.user?.id || "");
+  const initData = tg?.initData || "";
+  const lang    = urlP.searchParams.get("lang") || tg?.initDataUnsafe?.user?.language_code?.slice(0,2) || "uz";
+
+  const STATUS = {
+    pending:    { uz: "⏳ Kutilmoqda",       en: "⏳ Pending",     ru: "⏳ Ожидает" },
+    confirmed:  { uz: "✅ Tasdiqlangan",      en: "✅ Confirmed",   ru: "✅ Подтверждён" },
+    preparing:  { uz: "👨‍🍳 Tayyorlanmoqda",  en: "👨‍🍳 Preparing", ru: "👨‍🍳 Готовится" },
+    on_the_way: { uz: "🚗 Yo'lda",           en: "🚗 On the way",  ru: "🚗 В пути" },
+    delivered:  { uz: "📦 Yetkazildi",        en: "📦 Delivered",   ru: "📦 Доставлен" },
+    cancelled:  { uz: "❌ Bekor",             en: "❌ Cancelled",   ru: "❌ Отменён" },
+  };
+  const ACTIVE = new Set(["pending", "confirmed", "preparing", "on_the_way"]);
+
+  const L = (obj) => (obj && (obj[lang] || obj["uz"])) || "";
+
+  function fmtDate(iso) {
+    if (!iso) return "";
+    const d = new Date(iso.replace(" ", "T") + "Z");
+    return d.toLocaleDateString("uz-UZ", { day: "2-digit", month: "2-digit", year: "2-digit" })
+      + " " + d.toLocaleTimeString("uz-UZ", { hour: "2-digit", minute: "2-digit" });
+  }
+
+  function fmtAmount(n) {
+    return new Intl.NumberFormat("uz-UZ").format(n || 0) + " so'm";
+  }
+
+  async function load() {
+    try {
+      const qs = new URLSearchParams({ tenant, uid, init_data: initData, limit: 30 });
+      const r = await fetch(`/api/orders/history?${qs}`);
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail || "Xato");
+
+      const orders = d.orders || [];
+      document.getElementById("loading").classList.add("hidden");
+      document.getElementById("countSub").textContent = orders.length
+        ? `${orders.length} ta buyurtma`
+        : "—";
+
+      const list = document.getElementById("list");
+      list.classList.remove("hidden");
+
+      if (!orders.length) {
+        list.innerHTML = `
+          <div class="empty-state">
+            <div class="emoji">📦</div>
+            <p>${{ uz: "Hozircha buyurtmalar yo'q", en: "No orders yet", ru: "Заказов пока нет" }[lang] || "Hozircha buyurtmalar yo'q"}</p>
+          </div>`;
+        return;
+      }
+
+      list.innerHTML = orders.map(o => {
+        const isActive = ACTIVE.has(o.status);
+        const statusLabel = L(STATUS[o.status] || { uz: o.status });
+        const itemLines = (o.items || []).map(it => `${it.name} × ${it.qty}`).join(", ")
+          || o.service || "";
+
+        const trackBtn = isActive
+          ? `<a class="track-btn" href="/webapp/track?tenant=${encodeURIComponent(tenant)}&order_id=${o.id}&uid=${uid}" target="_blank">📍 Kuzatish</a>`
+          : "";
+
+        return `
+          <div class="order-card${isActive ? " active" : ""}">
+            <div class="order-head">
+              <span class="order-id">#${o.id}</span>
+              <span class="order-date">${fmtDate(o.created_at)}</span>
+            </div>
+            <div class="order-status ${o.status}">${statusLabel}</div>
+            ${itemLines ? `<div class="order-items">${itemLines}</div>` : ""}
+            <div class="order-footer">
+              <span class="order-amount">${fmtAmount(o.amount)}</span>
+              ${trackBtn}
+            </div>
+          </div>`;
+      }).join("");
+
+    } catch (e) {
+      document.getElementById("loading").classList.add("hidden");
+      document.getElementById("errBox").textContent = "⚠️ " + e.message;
+      document.getElementById("errBox").classList.remove("hidden");
+    }
+  }
+
+  load();
+</script>
+</body>
+</html>

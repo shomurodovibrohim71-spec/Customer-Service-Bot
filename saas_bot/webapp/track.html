@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0f1115">
+  <title>Kuryer kuzatuvi</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="/static/styles.css?v=20260518n">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    #map { width: 100%; height: 320px; border-radius: 16px; overflow: hidden; margin: 12px 0; background: #1a1d24; }
+    .track-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: 18px; margin-bottom: 12px; }
+    .track-status { font-size: 24px; font-weight: 900; color: var(--brand); margin-bottom: 6px; letter-spacing: -0.02em; }
+    .track-sub    { font-size: 14px; color: var(--text-muted); font-weight: 500; }
+    .track-info   { font-size: 15px; color: var(--text); margin-top: 12px; line-height: 1.8; font-weight: 500; }
+    .no-location  { text-align: center; padding: 40px 20px; color: var(--text-muted); font-size: 15px; line-height: 1.6; font-weight: 500; }
+    .refresh-btn  { width: 100%; padding: 14px; border-radius: var(--r-md); border: none; background: rgba(255,122,24,.12); color: var(--brand); font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 4px; font-family: inherit; }
+    .refresh-btn:active { opacity: .7; }
+    .updated-at   { font-size: 12px; color: var(--text-muted); text-align: center; margin-top: 8px; font-weight: 500; }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="page-title">🚗 Kuryer kuzatuvi</div>
+    <div class="page-sub" id="orderSub">—</div>
+  </header>
+  <main style="padding: 12px 16px;">
+    <div id="errBox" class="err hidden" style="margin-bottom:12px"></div>
+    <div id="loading" class="loading">Yuklanmoqda…</div>
+
+    <div id="content" class="hidden">
+      <div class="track-card">
+        <div class="track-status" id="statusText">—</div>
+        <div class="track-sub" id="statusSub"></div>
+        <div class="track-info" id="courierInfo"></div>
+      </div>
+
+      <div id="mapWrap">
+        <div id="map"></div>
+        <div class="updated-at" id="updatedAt"></div>
+      </div>
+      <div id="noLocation" class="no-location hidden">
+        🛰 Kuryer joylashuvi hali ma'lum emas.<br>
+        <span style="font-size:12px">Kuryer yo'lga chiqqach yangilanadi.</span>
+      </div>
+
+      <button class="refresh-btn" onclick="load()">🔄 Yangilash</button>
+    </div>
+  </main>
+
+<script>
+  const tg = window.Telegram?.WebApp;
+  if (tg) { tg.ready(); tg.expand(); }
+
+  const url = new URL(location.href);
+  const tenant  = url.searchParams.get("tenant") || "";
+  const orderId = url.searchParams.get("order_id") || "";
+  const uid     = url.searchParams.get("uid") || "";
+
+  document.getElementById("orderSub").textContent = orderId ? `#${orderId}` : "—";
+
+  const STATUS_LABELS = {
+    pending:    { uz: "⏳ Kutilmoqda",       en: "⏳ Pending",     ru: "⏳ Ожидает" },
+    confirmed:  { uz: "✅ Tasdiqlangan",      en: "✅ Confirmed",   ru: "✅ Подтверждён" },
+    preparing:  { uz: "👨‍🍳 Tayyorlanmoqda",  en: "👨‍🍳 Preparing", ru: "👨‍🍳 Готовится" },
+    on_the_way: { uz: "🚗 Yo'lda",           en: "🚗 On the way",  ru: "🚗 В пути" },
+    delivered:  { uz: "📦 Yetkazildi",        en: "📦 Delivered",   ru: "📦 Доставлен" },
+    cancelled:  { uz: "❌ Bekor qilindi",     en: "❌ Cancelled",   ru: "❌ Отменён" },
+  };
+
+  const lang = tg?.initDataUnsafe?.user?.language_code?.slice(0,2) || "uz";
+  const L = (obj) => obj[lang] || obj["uz"];
+
+  let map = null;
+  let marker = null;
+
+  function initMap(lat, lon) {
+    if (!map) {
+      map = L.map("map", { zoomControl: true, attributionControl: false }).setView([lat, lon], 15);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19 }).addTo(map);
+    }
+    const icon = L.divIcon({
+      html: '<div style="font-size:28px;line-height:1;">🚗</div>',
+      className: "", iconAnchor: [14, 28],
+    });
+    if (marker) {
+      marker.setLatLng([lat, lon]);
+    } else {
+      marker = L.marker([lat, lon], { icon }).addTo(map);
+    }
+    map.setView([lat, lon], 15);
+  }
+
+  async function load() {
+    if (!orderId || !tenant) {
+      document.getElementById("errBox").textContent = "⚠️ Buyurtma ID topilmadi.";
+      document.getElementById("errBox").classList.remove("hidden");
+      document.getElementById("loading").classList.add("hidden");
+      return;
+    }
+    try {
+      const qs = new URLSearchParams({ tenant, order_id: orderId, uid });
+      const r = await fetch(`/api/track?${qs}`);
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail || "Xato");
+
+      document.getElementById("loading").classList.add("hidden");
+      document.getElementById("content").classList.remove("hidden");
+
+      const sLabel = STATUS_LABELS[d.status] || { uz: d.status, en: d.status, ru: d.status };
+      document.getElementById("statusText").textContent = L(sLabel);
+
+      const etaText = d.eta_minutes ? ` · ~${d.eta_minutes} daq` : "";
+      document.getElementById("statusSub").textContent = `Buyurtma #${orderId}${etaText}`;
+
+      const infoLines = [];
+      if (d.courier_name) infoLines.push(`🧑‍✈️ ${d.courier_name}`);
+      if (d.courier_phone) infoLines.push(`📞 ${d.courier_phone}`);
+      document.getElementById("courierInfo").textContent = infoLines.join("\n");
+
+      if (d.courier_lat && d.courier_lon) {
+        document.getElementById("mapWrap").classList.remove("hidden");
+        document.getElementById("noLocation").classList.add("hidden");
+        initMap(d.courier_lat, d.courier_lon);
+        if (d.courier_updated_at) {
+          const dt = new Date(d.courier_updated_at + "Z");
+          document.getElementById("updatedAt").textContent =
+            "Yangilangan: " + dt.toLocaleTimeString("uz-UZ", { hour: "2-digit", minute: "2-digit" });
+        }
+      } else {
+        document.getElementById("mapWrap").classList.add("hidden");
+        document.getElementById("noLocation").classList.remove("hidden");
+      }
+    } catch (e) {
+      document.getElementById("loading").classList.add("hidden");
+      document.getElementById("errBox").textContent = "⚠️ " + e.message;
+      document.getElementById("errBox").classList.remove("hidden");
+    }
+  }
+
+  load();
+  // Auto-refresh every 30 seconds when order is on the way.
+  setInterval(load, 30000);
+</script>
+</body>
+</html>

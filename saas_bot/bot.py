@@ -108,7 +108,7 @@ async def _daily_report_job(context: CallbackContext) -> None:
         return
 
     top_lines = "\n".join(
-        f"  {i+1}. {t['name']} — {t['count']} ta" for i, t in enumerate(s.get("top", []))
+        f"  {i+1}. {t['name']} — {t['qty']} ta" for i, t in enumerate(s.get("top", []))
     ) or "  —"
 
     revenue = s["revenue"]

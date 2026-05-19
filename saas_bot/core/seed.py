@@ -13,8 +13,10 @@ logger = logging.getLogger(__name__)
 async def seed_tenant(db: Database, tenant: Tenant) -> None:
     """If products/branches tables are empty for this tenant, copy from config."""
     existing_products = await db.list_products(active_only=False)
-    if not existing_products:
-        for p in tenant.get("services", []):
+    existing_names = {p["name"] for p in existing_products}
+    seeded = 0
+    for p in tenant.get("services", []):
+        if p["name"] not in existing_names:
             await db.add_product(
                 name=p["name"],
                 price=p.get("price", ""),
@@ -23,7 +25,10 @@ async def seed_tenant(db: Database, tenant: Tenant) -> None:
                 image_url=p.get("image_url", ""),
                 price_value=p.get("price_value"),
             )
-        logger.info("[%s] seeded %d products", tenant.id, len(tenant.get("services", [])))
+            existing_names.add(p["name"])
+            seeded += 1
+    if seeded:
+        logger.info("[%s] seeded %d new products", tenant.id, seeded)
 
     # Seed the standalone-categories registry from config so the admin sees
     # categories even when there are no products in them.

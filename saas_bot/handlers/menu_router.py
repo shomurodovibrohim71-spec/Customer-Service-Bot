@@ -63,7 +63,7 @@ async def menu_router(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     if is_home_button_text(text):
         from utils.helpers import admin_reply_keyboard
         is_admin = tenant.is_admin(user.id) and not context.user_data.get("user_view")
-        kb = admin_reply_keyboard(tenant, lang) if is_admin else main_reply_keyboard(tenant, lang)
+        kb = admin_reply_keyboard(tenant, lang, user_id=user.id) if is_admin else main_reply_keyboard(tenant, lang, user_id=user.id)
         await update.message.reply_text(tenant.t(lang, "main_menu"), reply_markup=kb)
         return
 
@@ -105,7 +105,7 @@ async def menu_router(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     elif action == "back":
         await update.message.reply_text(
             tenant.t(lang, "main_menu"),
-            reply_markup=__import__("utils.helpers", fromlist=["main_reply_keyboard"]).main_reply_keyboard(tenant, lang),
+            reply_markup=main_reply_keyboard(tenant, lang, user_id=user.id),
         )
 
 
@@ -134,7 +134,7 @@ async def _show_loyalty(update, context, tenant: Tenant, db: Database, lang: str
     await update.message.reply_text(
         text,
         parse_mode=ParseMode.MARKDOWN,
-        reply_markup=main_reply_keyboard(tenant, lang),
+        reply_markup=main_reply_keyboard(tenant, lang, user_id=(update.effective_user.id if update.effective_user else None)),
     )
 
 
@@ -180,7 +180,7 @@ async def _show_about(update, context, tenant: Tenant, db: Database, lang: str) 
         lines.append(f"_{fallback}_")
     await update.message.reply_text(
         "\n".join(lines), parse_mode=ParseMode.MARKDOWN,
-        reply_markup=main_reply_keyboard(tenant, lang),
+        reply_markup=main_reply_keyboard(tenant, lang, user_id=(update.effective_user.id if update.effective_user else None)),
     )
 
 
@@ -231,7 +231,7 @@ async def _show_menu(update, context, tenant: Tenant, db: Database, lang: str) -
     await update.message.reply_text(
         text,
         parse_mode=ParseMode.MARKDOWN,
-        reply_markup=main_reply_keyboard(tenant, lang),
+        reply_markup=main_reply_keyboard(tenant, lang, user_id=(update.effective_user.id if update.effective_user else None)),
     )
 
 
@@ -239,7 +239,7 @@ async def _show_contact(update, context, tenant: Tenant, lang: str) -> None:
     await update.message.reply_text(
         tenant.t(lang, "contact_info", phone=tenant.get("phone", "")),
         parse_mode=ParseMode.MARKDOWN,
-        reply_markup=main_reply_keyboard(tenant, lang),
+        reply_markup=main_reply_keyboard(tenant, lang, user_id=(update.effective_user.id if update.effective_user else None)),
     )
 
 

@@ -38,8 +38,8 @@ from utils.helpers import (
 
 logger = logging.getLogger(__name__)
 
-# Conversation states for feedback intake and phone-change.
-FB_WAIT, PH_WAIT = range(2)
+# Conversation states for feedback intake, phone-change, and address edit.
+FB_WAIT, PH_WAIT, ADDR_EDIT = range(3)
 
 
 def _tenant(context: ContextTypes.DEFAULT_TYPE) -> Tenant:
@@ -86,7 +86,7 @@ async def geo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     )
     await msg.reply_text(
         tenant.t(lang, "geo_saved", address=address_text),
-        reply_markup=main_reply_keyboard(tenant, lang),
+        reply_markup=main_reply_keyboard(tenant, lang, user_id=(update.effective_user.id if update.effective_user else None)),
     )
 
 
@@ -142,6 +142,27 @@ async def points_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 # ============================================================ ADDRESSES
 
+def _addresses_text(addrs: list[dict], lang: str) -> str:
+    """Build the formatted address list message."""
+    header = {
+        "uz": "🏠 Mening manzillarim",
+        "en": "🏠 My addresses",
+        "ru": "🏠 Мои адреса",
+    }.get(lang, "🏠 Mening manzillarim")
+    count_label = {
+        "uz": f"{len(addrs)} ta manzil",
+        "en": f"{len(addrs)} address(es)",
+        "ru": f"{len(addrs)} адрес(а)",
+    }.get(lang, f"{len(addrs)} ta manzil")
+    hint = {
+        "uz": "📌 Tahrirlash yoki o'chirish uchun pastdagi tugmalardan foydalaning:",
+        "en": "📌 Use the buttons below to edit or delete an address:",
+        "ru": "📌 Используйте кнопки ниже для редактирования или удаления:",
+    }.get(lang, "📌 Tahrirlash yoki o'chirish uchun pastdagi tugmalardan foydalaning:")
+    lines = "\n\n".join(f"*{i}.* 📍 {a['text']}" for i, a in enumerate(addrs, start=1))
+    return f"*{header}* ({count_label})\n\n{lines}\n\n{hint}"
+
+
 async def addresses_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     msg = update.message
     user = update.effective_user
@@ -154,9 +175,8 @@ async def addresses_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     if not addrs:
         await msg.reply_text(tenant.t(lang, "addresses_empty"))
         return
-    lines = "\n".join(f"{i}. {a['text']}" for i, a in enumerate(addrs, start=1))
     await msg.reply_text(
-        tenant.t(lang, "addresses_list", lines=lines),
+        _addresses_text(addrs, lang),
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=addresses_list_keyboard(addrs),
     )
@@ -179,12 +199,71 @@ async def delete_address_callback(update: Update, context: ContextTypes.DEFAULT_
     if not addrs:
         await query.edit_message_text(tenant.t(lang, "addresses_empty"))
         return
-    lines = "\n".join(f"{i}. {a['text']}" for i, a in enumerate(addrs, start=1))
     await query.edit_message_text(
-        tenant.t(lang, "addresses_list", lines=lines),
+        _addresses_text(addrs, lang),
         parse_mode=ParseMode.MARKDOWN,
         reply_markup=addresses_list_keyboard(addrs),
     )
+
+
+async def edit_address_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    if query is None or query.data is None or update.effective_user is None:
+        return ConversationHandler.END
+    await query.answer()
+    tenant = _tenant(context)
+    db = _db(context)
+    lang = await _lang(db, update.effective_user.id, tenant.default_language)
+    try:
+        addr_id = int(query.data.split(":", 1)[1])
+    except (ValueError, IndexError):
+        return ConversationHandler.END
+    context.user_data["editing_addr_id"] = addr_id
+    cancel_label = {"uz": "❌ Bekor", "en": "❌ Cancel", "ru": "❌ Отмена"}.get(lang, "❌ Bekor")
+    await query.message.reply_text(
+        {"uz": "📝 Yangi manzil matnini yozing:", "en": "📝 Enter new address text:", "ru": "📝 Введите новый адрес:"}
+        .get(lang, "📝 Yangi manzil matnini yozing:"),
+        reply_markup=back_reply_keyboard(cancel_label),
+    )
+    return ADDR_EDIT
+
+
+async def addr_edit_capture(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    msg = update.message
+    user = update.effective_user
+    if msg is None or user is None or not msg.text:
+        return ADDR_EDIT
+    tenant = _tenant(context)
+    db = _db(context)
+    lang = await _lang(db, user.id, tenant.default_language)
+    cancel_labels = {"❌ Bekor", "❌ Cancel", "❌ Отмена"}
+    if msg.text.strip() in cancel_labels:
+        addrs = await db.list_addresses(user.id)
+        if addrs:
+            await msg.reply_text(
+                _addresses_text(addrs, lang),
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=addresses_list_keyboard(addrs),
+            )
+        else:
+            await msg.reply_text(tenant.t(lang, "addresses_empty"),
+                                 reply_markup=main_reply_keyboard(tenant, lang, user_id=user.id))
+        context.user_data.pop("editing_addr_id", None)
+        return ConversationHandler.END
+    addr_id = context.user_data.get("editing_addr_id")
+    if not addr_id:
+        return ConversationHandler.END
+    new_text = msg.text.strip()
+    await db.update_address(addr_id, user.id, new_text)
+    context.user_data.pop("editing_addr_id", None)
+    addrs = await db.list_addresses(user.id)
+    saved_msg = {"uz": "✅ Manzil yangilandi!", "en": "✅ Address updated!", "ru": "✅ Адрес обновлён!"}.get(lang, "✅ Manzil yangilandi!")
+    await msg.reply_text(
+        f"{saved_msg}\n\n" + _addresses_text(addrs, lang),
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=addresses_list_keyboard(addrs),
+    )
+    return ConversationHandler.END
 
 
 # ============================================================ FEEDBACK
@@ -218,7 +297,7 @@ async def feedback_capture(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     if tenant.action_from_label(msg.text) == "back":
         await msg.reply_text(
             tenant.t(lang, "main_menu"),
-            reply_markup=main_reply_keyboard(tenant, lang),
+            reply_markup=main_reply_keyboard(tenant, lang, user_id=(update.effective_user.id if update.effective_user else None)),
         )
         return ConversationHandler.END
 
@@ -240,7 +319,7 @@ async def feedback_capture(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         full = f"{confirm}\n\n🤖 {ai_reply}"
     else:
         full = confirm
-    await msg.reply_text(full, reply_markup=main_reply_keyboard(tenant, lang))
+    await msg.reply_text(full, reply_markup=main_reply_keyboard(tenant, lang, user_id=user.id))
 
     # Notify admins.
     cat_emoji = {"complaint": "📢", "question": "❓", "suggestion": "💡"}.get(category, "📧")
@@ -384,7 +463,7 @@ async def phone_change_capture(update: Update, context: ContextTypes.DEFAULT_TYP
     await db.set_phone(user.id, phone)
     await msg.reply_text(
         tenant.t(lang, "phone_changed", phone=phone),
-        reply_markup=main_reply_keyboard(tenant, lang),
+        reply_markup=main_reply_keyboard(tenant, lang, user_id=(update.effective_user.id if update.effective_user else None)),
     )
     return ConversationHandler.END
 
@@ -421,3 +500,11 @@ def register(app: Application, tenant: Tenant) -> None:
     app.add_handler(CallbackQueryHandler(settings_lang_callback, pattern=r"^set_lang$"))
     # Address delete callback.
     app.add_handler(CallbackQueryHandler(delete_address_callback, pattern=r"^deladdr:\d+$"))
+    # Address edit conversation - entry is the inline 'editaddr:N' callback.
+    app.add_handler(ConversationHandler(
+        entry_points=[CallbackQueryHandler(edit_address_callback, pattern=r"^editaddr:\d+$")],
+        states={ADDR_EDIT: [MessageHandler(filters.TEXT & ~filters.COMMAND, addr_edit_capture)]},
+        fallbacks=[CommandHandler("cancel", lambda u, c: ConversationHandler.END)],
+        name="addr_edit_flow",
+        per_message=False,
+    ), group=1)

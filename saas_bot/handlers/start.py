@@ -31,7 +31,7 @@ from utils.helpers import (
 
 def _keyboard_for(tenant, user_id: int, lang: str):
     """Return the admin keyboard if user is admin and not in user-view mode, else main."""
-    return admin_reply_keyboard(tenant, lang) if tenant.is_admin(user_id) else main_reply_keyboard(tenant, lang)
+    return admin_reply_keyboard(tenant, lang, user_id=user_id) if tenant.is_admin(user_id) else main_reply_keyboard(tenant, lang, user_id=user_id)
 
 logger = logging.getLogger(__name__)
 
@@ -78,16 +78,16 @@ async def _send_branch_prompt(chat_id: int, context, tenant: Tenant, db: Databas
     await _send_main_menu_for(chat_id, context, tenant, lang)
 
 
-async def _send_main_menu_for(chat_id: int, context, tenant: Tenant, lang: str) -> None:
-    user_id = context._user_id if hasattr(context, "_user_id") else None
+async def _send_main_menu_for(chat_id: int, context, tenant: Tenant, lang: str, user_id: int | None = None) -> None:
+    uid = user_id or (context._user_id if hasattr(context, "_user_id") else None)
     user_view = context.user_data.get("user_view", False)
-    is_admin = tenant.is_admin(user_id) and not user_view
+    is_admin = tenant.is_admin(uid) and not user_view
     if is_admin:
         text = tenant.admin_t(lang, "admin_welcome")
-        kb = admin_reply_keyboard(tenant, lang)
+        kb = admin_reply_keyboard(tenant, lang, user_id=uid)
     else:
         text = tenant.t(lang, "registered")
-        kb = main_reply_keyboard(tenant, lang)
+        kb = main_reply_keyboard(tenant, lang, user_id=uid)
     await context.bot.send_message(
         chat_id=chat_id, text=text, parse_mode=ParseMode.MARKDOWN, reply_markup=kb,
     )
@@ -137,13 +137,13 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         await update.message.reply_text(
             tenant.admin_t(lang, "admin_welcome"),
             parse_mode=ParseMode.MARKDOWN,
-            reply_markup=admin_reply_keyboard(tenant, lang),
+            reply_markup=admin_reply_keyboard(tenant, lang, user_id=user.id),
         )
     else:
         await update.message.reply_text(
             tenant.t(lang, "welcome"),
             parse_mode=ParseMode.MARKDOWN,
-            reply_markup=main_reply_keyboard(tenant, lang),
+            reply_markup=main_reply_keyboard(tenant, lang, user_id=user.id),
         )
 
 
@@ -172,7 +172,8 @@ async def language_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     if not phone:
         await _send_phone_prompt(chat_id, context, tenant, lang)
     else:
-        kb = admin_reply_keyboard(tenant, lang) if tenant.is_admin(user.id) and not context.user_data.get("user_view") else main_reply_keyboard(tenant, lang)
+        is_adm = tenant.is_admin(user.id) and not context.user_data.get("user_view")
+        kb = admin_reply_keyboard(tenant, lang, user_id=user.id) if is_adm else main_reply_keyboard(tenant, lang, user_id=user.id)
         await context.bot.send_message(
             chat_id=chat_id,
             text=tenant.t(lang, "language_changed"),
@@ -239,7 +240,7 @@ async def phone_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             chat_id=msg.chat_id,
             text=tenant.admin_t(lang, "admin_welcome"),
             parse_mode=ParseMode.MARKDOWN,
-            reply_markup=admin_reply_keyboard(tenant, lang),
+            reply_markup=admin_reply_keyboard(tenant, lang, user_id=user.id),
         )
     else:
         # After phone, next mandatory step is geolocation.
@@ -249,7 +250,7 @@ async def phone_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
                 chat_id=msg.chat_id,
                 text=tenant.t(lang, "registered"),
                 parse_mode=ParseMode.MARKDOWN,
-                reply_markup=main_reply_keyboard(tenant, lang),
+                reply_markup=main_reply_keyboard(tenant, lang, user_id=user.id),
             )
         else:
             await _send_location_prompt(msg.chat_id, context, tenant, lang)
@@ -296,7 +297,7 @@ async def onboarding_location_handler(update: Update, context: ContextTypes.DEFA
         chat_id=msg.chat_id,
         text=tenant.t(lang, "geo_saved_onboarding", address=addr_text),
         parse_mode=ParseMode.MARKDOWN,
-        reply_markup=main_reply_keyboard(tenant, lang),
+        reply_markup=main_reply_keyboard(tenant, lang, user_id=user.id),
     )
     raise ApplicationHandlerStop()
 
@@ -324,7 +325,8 @@ async def register_branch_callback(update: Update, context: ContextTypes.DEFAULT
         tenant.t(lang, "register_branch_saved", branch=branch["name"]),
         parse_mode=ParseMode.MARKDOWN,
     )
-    kb = admin_reply_keyboard(tenant, lang) if tenant.is_admin(user.id) and not context.user_data.get("user_view") else main_reply_keyboard(tenant, lang)
+    is_adm = tenant.is_admin(user.id) and not context.user_data.get("user_view")
+    kb = admin_reply_keyboard(tenant, lang, user_id=user.id) if is_adm else main_reply_keyboard(tenant, lang, user_id=user.id)
     await context.bot.send_message(
         chat_id=query.message.chat_id,
         text=tenant.t(lang, "main_menu"),

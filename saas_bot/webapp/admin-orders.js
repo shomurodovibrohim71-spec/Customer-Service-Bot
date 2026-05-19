@@ -113,13 +113,37 @@
       const cntToday = $("cnt_today");
       if (cntToday) cntToday.textContent = todayCount;
       $("totalCount").textContent = tfmt("total_short", { n: state.all.length });
-      renderList();
+      // Detect new orders
+      const newMax = state.all.reduce((m, o) => Math.max(m, o.id), 0);
+      const incoming = new Set(state.all.filter(o => o.id > _lastMaxId).map(o => o.id));
+      const isNew = _lastMaxId > 0 && incoming.size > 0;
+      _lastMaxId = newMax;
+      updateRefreshBadge(isNew);
+      if (isNew && tg?.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
+      renderList(isNew ? incoming : null);
     } catch (e) {
       list.innerHTML = `<div class="err">⚠️ ${escapeHtml(e.message)}</div>`;
     }
   }
 
-  function renderList() {
+  // ── New-order tracking for auto-refresh ──────────────────────────────────
+  let _lastMaxId = 0;
+  let _newIds = new Set();
+
+  function updateRefreshBadge(isNew) {
+    const el = $("refreshBadge");
+    if (!el) return;
+    const t = new Date().toLocaleTimeString("uz-UZ", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    if (isNew) {
+      el.textContent = `🆕 Yangi buyurtma! ${t}`;
+      el.classList.add("new");
+      setTimeout(() => el.classList.remove("new"), 2000);
+    } else {
+      el.textContent = `🔄 ${t}`;
+    }
+  }
+
+  function renderList(newIds) {
     const list = $("list");
     list.innerHTML = "";
     let items = state.all;
@@ -138,7 +162,18 @@
       list.innerHTML = `<div class="ao-empty"><div class="ao-empty-icon">📋</div>${T("empty")}</div>`;
       return;
     }
-    items.forEach(o => list.appendChild(card(o)));
+    // Pending orders first, then by id desc
+    items = [...items].sort((a, b) => {
+      const pa = a.status === "pending" ? 1 : 0;
+      const pb = b.status === "pending" ? 1 : 0;
+      if (pa !== pb) return pb - pa;
+      return b.id - a.id;
+    });
+    items.forEach(o => {
+      const el = card(o);
+      if (newIds && newIds.has(o.id)) el.classList.add("is-new");
+      list.appendChild(el);
+    });
   }
 
   function statusClass(s) {
@@ -150,7 +185,7 @@
 
   function card(o) {
     const el = document.createElement("article");
-    el.className = "ao-card";
+    el.className = "ao-card" + (o.status === "pending" ? " is-pending" : "");
 
     const itemsList = (o.items || []).slice(0, 3);
     const chipsHtml = itemsList.length
@@ -478,6 +513,20 @@
   };
 
   $("detailBack").onclick = () => closeScreen("detailScreen");
+
+  // ── Auto-refresh every 30 seconds ────────────────────────────────────────
+  async function silentRefresh() {
+    if (document.hidden || screenStack.length > 0) return;
+    try { await load(); } catch {}
+  }
+  setInterval(silentRefresh, 30000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) silentRefresh(); });
+
+  $("manualRefreshBtn").onclick = async () => {
+    $("manualRefreshBtn").textContent = "…";
+    try { await load(); } catch {}
+    $("manualRefreshBtn").textContent = "🔄 Yangilash";
+  };
 
   load();
 })();

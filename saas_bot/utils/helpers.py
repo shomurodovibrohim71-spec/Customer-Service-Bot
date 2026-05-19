@@ -10,6 +10,7 @@ from telegram import (
     KeyboardButton,
     ReplyKeyboardMarkup,
     ReplyKeyboardRemove,
+    WebAppInfo,
 )
 
 PHONE_RE = re.compile(r"^\+?\d{9,15}$")
@@ -144,30 +145,65 @@ def delete_items_keyboard(items: list[dict], prefix: str) -> InlineKeyboardMarku
 
 # --------------------------------------------------------------- reply KB
 
-def main_reply_keyboard(tenant, lang: str) -> ReplyKeyboardMarkup:
+def main_reply_keyboard(tenant, lang: str, user_id: int | None = None) -> ReplyKeyboardMarkup:
     """4-row x 2-column reply keyboard matching the Mini Food layout."""
+    from config.settings import get_webapp_url
     L = lambda action: tenant.label(lang, action)  # noqa: E731
+    webapp_url = get_webapp_url() if user_id else None
+    if webapp_url and user_id:
+        order_btn = KeyboardButton(
+            L("order"),
+            web_app=WebAppInfo(url=f"{webapp_url}/webapp?tenant={tenant.id}&uid={user_id}&lang={lang}"),
+        )
+        my_orders_btn = KeyboardButton(
+            L("my_orders"),
+            web_app=WebAppInfo(url=f"{webapp_url}/webapp/my-orders?tenant={tenant.id}&uid={user_id}&lang={lang}"),
+        )
+        branches_btn = KeyboardButton(
+            L("branches"),
+            web_app=WebAppInfo(url=f"{webapp_url}/webapp/branches?tenant={tenant.id}&lang={lang}"),
+        )
+    else:
+        order_btn = KeyboardButton(L("order"))
+        my_orders_btn = KeyboardButton(L("my_orders"))
+        branches_btn = KeyboardButton(L("branches"))
     rows = [
-        [KeyboardButton(L("order")), KeyboardButton(L("geo"), request_location=True)],
-        [KeyboardButton(L("loyalty_qr")), KeyboardButton(L("points"))],
-        [KeyboardButton(L("branches")), KeyboardButton(L("addresses"))],
-        [KeyboardButton(L("feedback")), KeyboardButton(L("about"))],
-        [KeyboardButton(L("settings"))],
+        [order_btn, my_orders_btn],
+        [KeyboardButton(L("geo"), request_location=True), KeyboardButton(L("loyalty_qr"))],
+        [KeyboardButton(L("points")), branches_btn],
+        [KeyboardButton(L("addresses")), KeyboardButton(L("feedback"))],
+        [KeyboardButton(L("about")), KeyboardButton(L("settings"))],
     ]
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)
 
 
-def admin_reply_keyboard(tenant, lang: str) -> ReplyKeyboardMarkup:
+def admin_reply_keyboard(tenant, lang: str, user_id: int | None = None) -> ReplyKeyboardMarkup:
     """Admin-only reply keyboard. Product add/edit/delete all live inside the
     📦 Mahsulotlar WebApp - no separate 'add product' button is shown."""
+    from config.settings import get_webapp_url
     L = lambda action: tenant.admin_label(lang, action)  # noqa: E731
+    webapp_url = get_webapp_url() if user_id else None
+
+    def wb(path: str) -> KeyboardButton | None:
+        if webapp_url and user_id:
+            url = f"{webapp_url}/webapp/admin/{path}?tenant={tenant.id}&uid={user_id}&lang={lang}"
+            return url
+        return None
+
+    def btn(action: str, path: str | None = None) -> KeyboardButton:
+        if path:
+            url = wb(path)
+            if url:
+                return KeyboardButton(L(action), web_app=WebAppInfo(url=url))
+        return KeyboardButton(L(action))
+
     rows = [
-        [KeyboardButton(L("list_products")), KeyboardButton(L("list_branches"))],
-        [KeyboardButton(L("add_branch")),    KeyboardButton(L("orders"))],
-        [KeyboardButton(L("stats")),         KeyboardButton(L("promos"))],
-        [KeyboardButton(L("feedback_list")), KeyboardButton(L("about_us"))],
-        [KeyboardButton(L("users")),         KeyboardButton(L("couriers"))],
-        [KeyboardButton(L("broadcast")),     KeyboardButton(L("user_view"))],
+        [btn("list_products", "products"), btn("list_branches", "branches")],
+        [btn("orders", "orders"),          btn("stats", "stats")],
+        [btn("promos", "promos"),          btn("feedback_list", "feedback")],
+        [btn("about_us", "company"),       btn("users", "users")],
+        [btn("couriers", "couriers"),      KeyboardButton(L("broadcast"))],
+        [KeyboardButton(L("user_view"))],
     ]
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)
 
@@ -247,11 +283,13 @@ def settings_inline_keyboard(lang_label: str, phone_label: str) -> InlineKeyboar
 
 
 def addresses_list_keyboard(addresses: list[dict]) -> InlineKeyboardMarkup:
-    """One delete button per saved address."""
-    rows = [
-        [InlineKeyboardButton(f"🗑 {a['text'][:40]}", callback_data=f"deladdr:{a['id']}")]
-        for a in addresses
-    ]
+    """One row per address: numbered edit + delete buttons."""
+    rows = []
+    for i, a in enumerate(addresses, start=1):
+        rows.append([
+            InlineKeyboardButton(f"✏️ {i}-manzil", callback_data=f"editaddr:{a['id']}"),
+            InlineKeyboardButton(f"🗑 {i}-manzil", callback_data=f"deladdr:{a['id']}"),
+        ])
     return InlineKeyboardMarkup(rows) if rows else InlineKeyboardMarkup([])
 
 

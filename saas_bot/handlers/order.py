@@ -542,16 +542,16 @@ async def pick_category(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         kb = _product_keyboard(p["id"], cat, in_cart, cart_n, tenant, lang)
         if p.get("image_url"):
             try:
-                await context.bot.send_photo(
+                await context.bot.send_document(
                     chat_id=chat_id,
-                    photo=p["image_url"],
+                    document=p["image_url"],
                     caption=caption,
                     parse_mode=ParseMode.MARKDOWN,
                     reply_markup=kb,
                 )
                 continue
             except TelegramError as exc:
-                logger.warning("send_photo failed for %s: %s", p["name"], exc)
+                logger.warning("send_document failed for %s: %s", p["name"], exc)
         await context.bot.send_message(
             chat_id=chat_id,
             text=caption,
@@ -780,7 +780,7 @@ async def confirm_order(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     await context.bot.send_message(
         chat_id=query.message.chat_id,
         text=tenant.t(lang, "main_menu"),
-        reply_markup=main_reply_keyboard(tenant, lang),
+        reply_markup=main_reply_keyboard(tenant, lang, user_id=user.id),
     )
     await _notify_admins(context, tenant, order_id, order, user, lines, total)
     cart_clear(context.user_data)
@@ -829,13 +829,15 @@ async def _cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             await update.callback_query.edit_message_text(msg)
         except TelegramError:
             pass
+        uid = update.effective_user.id if update.effective_user else None
         await context.bot.send_message(
             chat_id=update.callback_query.message.chat_id,
             text=tenant.t(lang, "main_menu"),
-            reply_markup=main_reply_keyboard(tenant, lang),
+            reply_markup=main_reply_keyboard(tenant, lang, user_id=uid),
         )
     elif update.message is not None:
-        await update.message.reply_text(msg, reply_markup=main_reply_keyboard(tenant, lang))
+        uid = update.effective_user.id if update.effective_user else None
+        await update.message.reply_text(msg, reply_markup=main_reply_keyboard(tenant, lang, user_id=uid))
     cart_clear(context.user_data)
     context.user_data.pop("order", None)
     return ConversationHandler.END

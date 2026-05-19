@@ -169,7 +169,7 @@ async def admin_router(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await update.message.reply_text(
             tenant.admin_t(lang, "user_view_on"),
             parse_mode=ParseMode.MARKDOWN,
-            reply_markup=main_reply_keyboard(tenant, lang),
+            reply_markup=main_reply_keyboard(tenant, lang, user_id=user.id),
         )
 
 
@@ -374,7 +374,7 @@ async def edit_field_capture(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await update.message.reply_text(
         tenant.admin_t(lang, "about_saved"),
         parse_mode=ParseMode.MARKDOWN,
-        reply_markup=admin_reply_keyboard(tenant, lang),
+        reply_markup=admin_reply_keyboard(tenant, lang, user_id=user.id if user else None),
     )
     return ConversationHandler.END
 
@@ -453,7 +453,7 @@ async def admin_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     context.user_data["user_view"] = False
     await update.message.reply_text(
         tenant.admin_t(lang, "admin_view_on"),
-        reply_markup=admin_reply_keyboard(tenant, lang),
+        reply_markup=admin_reply_keyboard(tenant, lang, user_id=update.effective_user.id),
     )
 
 

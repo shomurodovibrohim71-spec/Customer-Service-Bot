@@ -98,44 +98,40 @@
       const sec = document.createElement("section");
       sec.className = "admin-cat-section";
       sec.innerHTML = `<h3 class="cat-title">${escapeHtml(cat)} <span class="muted">${items.length} ${T("cnt_suffix")}</span></h3>`;
-      const grid = document.createElement("div");
-      grid.className = "admin-prod-grid";
-      items.forEach(p => grid.appendChild(card(p)));
-      sec.appendChild(grid);
+      const rows = document.createElement("div");
+      rows.className = "admin-prod-list";
+      items.forEach(p => rows.appendChild(card(p)));
+      sec.appendChild(rows);
       list.appendChild(sec);
     }
   }
 
   function card(p) {
     const isHidden = p.is_active === 0;
-    const c = document.createElement("div");
-    c.className = "admin-prod-card" + (isHidden ? " prod-hidden" : p.in_stock === 0 ? " out-of-stock" : "");
+    const row = document.createElement("div");
+    row.className = "apr" + (isHidden ? " prod-hidden" : p.in_stock === 0 ? " out-of-stock" : "");
 
-    // Image
+    // Thumbnail
     if (p.image_url) {
       const im = document.createElement("img");
-      im.className = "prod-img"; im.src = p.image_url; im.alt = p.name;
-      c.appendChild(im);
+      im.className = "apr-thumb"; im.src = p.image_url; im.alt = p.name;
+      row.appendChild(im);
     } else {
       const ph = document.createElement("div");
-      ph.className = "admin-prod-img-empty"; ph.textContent = "🍔";
-      c.appendChild(ph);
+      ph.className = "apr-thumb-empty"; ph.textContent = "🍔";
+      row.appendChild(ph);
     }
 
-    // Body
-    const body = document.createElement("div");
-    body.className = "prod-body";
+    // Name + price
+    const info = document.createElement("div");
+    info.className = "apr-info";
     const hiddenBadge = isHidden ? `<span class="prod-hidden-badge">${T("hidden_label")}</span>` : "";
-    body.innerHTML = `
-      <div class="prod-name">${escapeHtml(p.name)} ${hiddenBadge}</div>
-      <div class="prod-price">${fmt(p.price_value)} so'm</div>`;
-    c.appendChild(body);
+    info.innerHTML = `
+      <div class="apr-name">${escapeHtml(p.name)}${hiddenBadge}</div>
+      <div class="apr-price">${fmt(p.price_value)}</div>`;
+    row.appendChild(info);
 
-    // Action row
-    const actions = document.createElement("div");
-    actions.className = "prod-actions";
-
-    // Toggle switch (ko'rsatish/yashirish)
+    // Toggle switch
     const toggleWrap = document.createElement("label");
     toggleWrap.className = "prod-toggle-wrap";
     toggleWrap.title = isHidden ? T("btn_activate") : T("btn_hide_hint");
@@ -155,16 +151,18 @@
     toggleSlider.className = "prod-toggle-slider";
     toggleWrap.appendChild(toggleInput);
     toggleWrap.appendChild(toggleSlider);
+    row.appendChild(toggleWrap);
 
-    // Edit tugmasi
+    // Edit button
     const editBtn = document.createElement("button");
-    editBtn.className = "prod-btn prod-btn-edit";
+    editBtn.className = "apr-btn apr-edit";
     editBtn.textContent = "✏️";
     editBtn.onclick = (e) => { e.stopPropagation(); openEdit(p); };
+    row.appendChild(editBtn);
 
-    // O'chirish tugmasi
+    // Delete button
     const delBtn = document.createElement("button");
-    delBtn.className = "prod-btn prod-btn-del";
+    delBtn.className = "apr-btn apr-del";
     delBtn.textContent = "🗑";
     delBtn.onclick = async (e) => {
       e.stopPropagation();
@@ -177,13 +175,9 @@
       } catch (err) { alert("⚠️ " + err.message); }
       finally { delBtn.disabled = false; }
     };
+    row.appendChild(delBtn);
 
-    actions.appendChild(toggleWrap);
-    actions.appendChild(editBtn);
-    actions.appendChild(delBtn);
-
-    c.appendChild(actions);
-    return c;
+    return row;
   }
 
   function openEdit(p) {

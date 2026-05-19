@@ -6,62 +6,78 @@
   <meta name="theme-color" content="#0f1115">
   <title>Products</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link rel="stylesheet" href="/static/styles.css?v=20260517c">
+  <link rel="stylesheet" href="/static/styles.css?v=20260518n">
   <style>
-    /* Product card — premium redesign */
-    .admin-prod-card {
+    /* ── Product list row (replaces card grid) ──────────────────────────── */
+    .admin-prod-list { display: flex; flex-direction: column; gap: 6px; }
+
+    .apr {
+      display: flex; align-items: center; gap: 10px;
       background: var(--surface); border: 1px solid var(--line);
-      border-radius: var(--r-lg); overflow: hidden; position: relative;
-      transition: border-color .2s var(--ease);
+      border-radius: var(--r-md); padding: 10px 12px;
+      transition: border-color .2s;
     }
-    .admin-prod-card.out-of-stock { opacity: .6; }
-    .admin-prod-card .prod-img {
-      width: 100%; aspect-ratio: 4/3; object-fit: cover;
-      background: var(--bg-soft); display: block;
+    .apr.prod-hidden  { opacity: .55; border-style: dashed; }
+    .apr.out-of-stock { opacity: .6; }
+
+    /* Thumbnail */
+    .apr-thumb {
+      width: 54px; height: 54px; flex-shrink: 0;
+      border-radius: 10px; object-fit: cover;
+      background: var(--bg-soft);
     }
-    .admin-prod-img-empty {
-      width: 100%; aspect-ratio: 4/3; display: flex; align-items: center;
-      justify-content: center; font-size: 32px; background: var(--bg-soft);
+    .apr-thumb-empty {
+      width: 54px; height: 54px; flex-shrink: 0;
+      border-radius: 10px; background: var(--bg-soft);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px;
     }
-    .prod-body { padding: 10px 12px 0; }
-    .prod-name { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 2px;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .prod-price { font-size: 13px; font-weight: 800; color: var(--brand); margin-bottom: 8px; }
-    .prod-actions { display: flex; gap: 5px; padding: 0 12px 10px; align-items: center; }
-    .prod-btn {
-      flex: 1; padding: 7px 0; border-radius: var(--r-md); border: none;
-      font-size: 11px; font-weight: 700; cursor: pointer; text-align: center;
-      transition: opacity .15s, transform .1s var(--ease);
+
+    /* Info */
+    .apr-info { flex: 1; min-width: 0; }
+    .apr-name {
+      font-size: 14px; font-weight: 700; color: var(--text);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
-    .prod-btn:active { opacity: .75; transform: scale(0.97); }
-    .prod-btn-edit { background: rgba(255,122,24,.15); color: var(--brand); }
-    .prod-btn-del  { background: rgba(255,93,93,.12); color: var(--danger); max-width: 36px; }
+    .apr-price { font-size: 12px; font-weight: 800; color: var(--brand); margin-top: 2px; }
+
+    /* Hidden badge */
+    .prod-hidden-badge {
+      display: inline-block; font-size: 9px; font-weight: 800;
+      background: rgba(255,93,93,.18); color: var(--danger);
+      padding: 1px 5px; border-radius: 4px; vertical-align: middle; margin-left: 4px;
+    }
+
     /* Toggle switch */
     .prod-toggle-wrap {
-      flex: 1.6; display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; display: flex; align-items: center;
       position: relative; height: 28px; cursor: pointer;
     }
     .prod-toggle-wrap input { opacity: 0; width: 0; height: 0; position: absolute; }
     .prod-toggle-slider {
       position: relative; display: block;
-      width: 46px; height: 26px; border-radius: 999px;
-      background: rgba(255,255,255,0.12);
-      transition: background .2s;
+      width: 44px; height: 24px; border-radius: 999px;
+      background: rgba(255,255,255,0.12); transition: background .2s;
     }
     .prod-toggle-slider::before {
       content: ""; position: absolute;
-      width: 20px; height: 20px; border-radius: 50%; background: #fff;
+      width: 18px; height: 18px; border-radius: 50%; background: #fff;
       left: 3px; top: 3px; transition: transform .2s, box-shadow .2s;
       box-shadow: 0 1px 4px rgba(0,0,0,0.35);
     }
     .prod-toggle-wrap input:checked + .prod-toggle-slider { background: #ff7a18; }
     .prod-toggle-wrap input:checked + .prod-toggle-slider::before { transform: translateX(20px); }
-    .admin-prod-card.prod-hidden { opacity: .5; border-style: dashed; }
-    .prod-hidden-badge {
-      display: inline-block; font-size: 9px; font-weight: 800;
-      background: rgba(255,93,93,.18); color: var(--danger);
-      padding: 1px 5px; border-radius: 4px; vertical-align: middle; margin-left: 3px;
+
+    /* Edit / delete buttons */
+    .apr-btn {
+      flex-shrink: 0; width: 36px; height: 36px;
+      border-radius: 10px; border: none; cursor: pointer;
+      font-size: 15px; display: flex; align-items: center; justify-content: center;
+      transition: opacity .15s, transform .1s;
     }
+    .apr-btn:active { opacity: .7; transform: scale(0.93); }
+    .apr-edit { background: rgba(255,122,24,.15); color: var(--brand); }
+    .apr-del  { background: rgba(255,93,93,.12);  color: var(--danger); }
 
     /* upsell toggle row */
     .upsell-row { display: flex; align-items: center; justify-content: space-between; background: var(--card, #1f232d); border-radius: 12px; padding: 11px 14px; }
@@ -72,10 +88,6 @@
     .upsell-toggle input:checked + .upsell-slider { background: #ff7a18; }
     .upsell-slider::before { content: ""; position: absolute; width: 18px; height: 18px; border-radius: 50%; background: #fff; left: 3px; top: 3px; transition: transform .2s; }
     .upsell-toggle input:checked + .upsell-slider::before { transform: translateX(20px); }
-
-    /* old stock badge styles kept for compatibility */
-    .stock-badge.in  { background: rgba(74,222,128,0.18); color: #4ade80; }
-    .stock-badge.out { background: rgba(255,93,93,0.15); color: #f87171; }
   </style>
 </head>
 <body>
@@ -220,6 +232,6 @@
     };
   </script>
   <script src="/static/i18n.js?v=20260517c"></script>
-  <script src="/static/admin-products.js?v=20260517c"></script>
+  <script src="/static/admin-products.js?v=20260518p"></script>
 </body>
 </html>
